@@ -1,7 +1,7 @@
 {
   "name": "MEALQUEST",
   "description": "Your Daily Food Adventure - A personal food decision assistant and RPG meal tracker for students and outside eaters.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
 
