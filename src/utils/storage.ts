@@ -1,35 +1,37 @@
 import { ActualMealLog, FoodItem, MealType, PlayerProfile } from '../types';
+import { getLocalDateKey, getYesterdayLocalDateKey } from './dateUtils';
 
 export const DEFAULT_INVENTORIES: Record<MealType, FoodItem[]> = {
   morning: [
-    { id: 'm-1', name: 'Idli', price: 10, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'm-2', name: 'Dosa', price: 30, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'm-3', name: 'Vada', price: 15, quantity: 1, category: 'FRIED / HEAVY' },
-    { id: 'm-4', name: 'Pongal', price: 35, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'm-5', name: 'Egg', price: 10, quantity: 1, category: 'PROTEIN' },
-    { id: 'm-6', name: 'Tea', price: 12, quantity: 1, category: 'DRINK' }
+    { id: 'm-1', name: 'Idli', price: 10, availableQuantity: 3, quantity: 3, category: 'MAIN FOOD' },
+    { id: 'm-2', name: 'Dosa', price: 30, availableQuantity: 2, quantity: 2, category: 'MAIN FOOD' },
+    { id: 'm-3', name: 'Vada', price: 15, availableQuantity: 1, quantity: 1, category: 'FRIED / HEAVY' },
+    { id: 'm-4', name: 'Pongal', price: 35, availableQuantity: 1, quantity: 1, category: 'MAIN FOOD' },
+    { id: 'm-5', name: 'Egg', price: 10, availableQuantity: 2, quantity: 2, category: 'PROTEIN' },
+    { id: 'm-6', name: 'Tea', price: 12, availableQuantity: 1, quantity: 1, category: 'DRINK' }
   ],
   afternoon: [
-    { id: 'a-1', name: 'Rice', price: 30, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'a-2', name: 'Sambar', price: 20, quantity: 1, category: 'SIDE / ACCOMPANIMENT' },
-    { id: 'a-3', name: 'Poriyal', price: 20, quantity: 1, category: 'VEGETABLE' },
-    { id: 'a-4', name: 'Egg', price: 10, quantity: 1, category: 'PROTEIN' },
-    { id: 'a-5', name: 'Chicken', price: 70, quantity: 1, category: 'PROTEIN' },
-    { id: 'a-6', name: 'Curd', price: 15, quantity: 1, category: 'SIDE / ACCOMPANIMENT' },
-    { id: 'a-7', name: 'Fried Chicken', price: 80, quantity: 1, category: 'FRIED / HEAVY' }
+    { id: 'a-1', name: 'Rice', price: 30, availableQuantity: 1, quantity: 1, category: 'MAIN FOOD' },
+    { id: 'a-2', name: 'Sambar', price: 20, availableQuantity: 1, quantity: 1, category: 'SIDE / ACCOMPANIMENT' },
+    { id: 'a-3', name: 'Poriyal', price: 20, availableQuantity: 1, quantity: 1, category: 'VEGETABLE' },
+    { id: 'a-4', name: 'Egg', price: 10, availableQuantity: 2, quantity: 2, category: 'PROTEIN' },
+    { id: 'a-5', name: 'Chicken', price: 70, availableQuantity: 1, quantity: 1, category: 'PROTEIN' },
+    { id: 'a-6', name: 'Curd', price: 15, availableQuantity: 1, quantity: 1, category: 'SIDE / ACCOMPANIMENT' },
+    { id: 'a-7', name: 'Fried Chicken', price: 80, availableQuantity: 1, quantity: 1, category: 'FRIED / HEAVY' }
   ],
   night: [
-    { id: 'n-1', name: 'Idli', price: 10, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'n-2', name: 'Dosa', price: 30, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'n-3', name: 'Chapati', price: 15, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'n-4', name: 'Egg', price: 10, quantity: 1, category: 'PROTEIN' },
-    { id: 'n-5', name: 'Parotta', price: 20, quantity: 1, category: 'MAIN FOOD' },
-    { id: 'n-6', name: 'Curd', price: 15, quantity: 1, category: 'SIDE / ACCOMPANIMENT' }
+    { id: 'n-1', name: 'Idli', price: 10, availableQuantity: 3, quantity: 3, category: 'MAIN FOOD' },
+    { id: 'n-2', name: 'Dosa', price: 30, availableQuantity: 2, quantity: 2, category: 'MAIN FOOD' },
+    { id: 'n-3', name: 'Chapati', price: 15, availableQuantity: 2, quantity: 2, category: 'MAIN FOOD' },
+    { id: 'n-4', name: 'Egg', price: 10, availableQuantity: 2, quantity: 2, category: 'PROTEIN' },
+    { id: 'n-5', name: 'Parotta', price: 20, availableQuantity: 2, quantity: 2, category: 'MAIN FOOD' },
+    { id: 'n-6', name: 'Curd', price: 15, availableQuantity: 1, quantity: 1, category: 'SIDE / ACCOMPANIMENT' }
   ]
 };
 
 export const DEFAULT_PROFILE: PlayerProfile = {
-  name: 'Aakhash',
+  name: 'Adventurer',
+  age: 21,
   dailyBudget: 300,
   heightCm: 170,
   weightKg: 65,
@@ -54,7 +56,12 @@ export function loadProfile(): PlayerProfile {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
     if (!raw) return DEFAULT_PROFILE;
-    return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_PROFILE,
+      ...parsed,
+      age: typeof parsed.age === 'number' && parsed.age > 0 ? parsed.age : 21
+    };
   } catch (err) {
     console.error('Failed to load profile:', err);
     return DEFAULT_PROFILE;
@@ -69,15 +76,29 @@ export function saveProfile(profile: PlayerProfile): void {
   }
 }
 
+function normalizeInventoryItems(items: any[]): FoodItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map(item => {
+    const avail = typeof item.availableQuantity === 'number'
+      ? item.availableQuantity
+      : (typeof item.quantity === 'number' ? item.quantity : 1);
+    return {
+      ...item,
+      availableQuantity: avail,
+      quantity: avail
+    };
+  });
+}
+
 export function loadInventories(): Record<MealType, FoodItem[]> {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.INVENTORY);
     if (!raw) return DEFAULT_INVENTORIES;
     const parsed = JSON.parse(raw);
     return {
-      morning: parsed.morning || DEFAULT_INVENTORIES.morning,
-      afternoon: parsed.afternoon || DEFAULT_INVENTORIES.afternoon,
-      night: parsed.night || DEFAULT_INVENTORIES.night
+      morning: normalizeInventoryItems(parsed.morning || DEFAULT_INVENTORIES.morning),
+      afternoon: normalizeInventoryItems(parsed.afternoon || DEFAULT_INVENTORIES.afternoon),
+      night: normalizeInventoryItems(parsed.night || DEFAULT_INVENTORIES.night)
     };
   } catch (err) {
     console.error('Failed to load inventories:', err);
@@ -119,10 +140,8 @@ export function calculateRealStreak(history: ActualMealLog[]): number {
   const uniqueDates = Array.from(new Set(history.map(h => h.dateKey))).sort();
   if (uniqueDates.length === 0) return 0;
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const yesterdayDate = new Date();
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+  const todayStr = getLocalDateKey();
+  const yesterdayStr = getYesterdayLocalDateKey();
 
   const lastLoggedDate = uniqueDates[uniqueDates.length - 1];
 

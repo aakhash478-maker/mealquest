@@ -17,6 +17,7 @@ import {
   calculateRealStreak
 } from './utils/storage';
 import { calculateDailyOverallScore } from './utils/ratingEngine';
+import { getLocalDateKey } from './utils/dateUtils';
 import { SplashScreen } from './components/SplashScreen';
 import { Navbar, NavTab } from './components/Navbar';
 import { HomeBase } from './components/HomeBase';
@@ -79,7 +80,7 @@ export default function App() {
   };
 
   // Today's logs
-  const todayKey = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayKey = useMemo(() => getLocalDateKey(), []);
 
   const todayLogs = useMemo(() => {
     const morning = mealHistory.find(m => m.dateKey === todayKey && m.mealType === 'morning');
@@ -188,7 +189,7 @@ export default function App() {
           </div>
 
           <div className="text-slate-400">
-            Created by <strong className="text-purple-300">Aakhash A</strong>
+            Hotel Meal Balance & Budget Navigator
           </div>
 
           <div className="flex items-center gap-4 text-slate-500">

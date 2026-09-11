@@ -8,6 +8,7 @@ import {
   ScorePenalty,
 } from '../types';
 import { detectFoodCategory, isFriedOrHeavy, isNonVegetarian } from './foodClassifier';
+import { getLocalDateKey } from './dateUtils';
 
 export function evaluateActualMeal(
   actualFoodText: string,
@@ -219,7 +220,7 @@ export function calculateDailyOverallScore(
 
   if (loggedMeals.length === 0) {
     return {
-      dateKey: new Date().toISOString().split('T')[0],
+      dateKey: getLocalDateKey(),
       morning: undefined,
       afternoon: undefined,
       night: undefined,
@@ -263,7 +264,7 @@ export function calculateDailyOverallScore(
   }
 
   return {
-    dateKey: new Date().toISOString().split('T')[0],
+    dateKey: getLocalDateKey(),
     morning: morningLog,
     afternoon: afternoonLog,
     night: nightLog,

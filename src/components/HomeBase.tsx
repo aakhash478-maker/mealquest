@@ -16,6 +16,7 @@ import {
 import { ActualMealLog, DailyScoreSummary, PlayerProfile } from '../types';
 import { NavTab } from './Navbar';
 import { playButtonClick } from '../utils/soundEffects';
+import { formatLocalDateWithWeekday } from '../utils/dateUtils';
 
 interface HomeBaseProps {
   profile: PlayerProfile;
@@ -70,9 +71,11 @@ export const HomeBase: React.FC<HomeBaseProps> = ({
       {/* Welcome & Player Status Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-purple-950/60 via-slate-900/80 to-slate-900/60 border border-purple-500/30 backdrop-blur-md shadow-xl glow-purple">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono tracking-wider text-purple-300 uppercase mb-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono tracking-wider text-purple-300 uppercase mb-1">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>HQ COMMANDER // BASE CAMP</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-amber-300 font-semibold">{formatLocalDateWithWeekday()}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-rpg tracking-wide flex items-center gap-2">
             Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-purple-200 to-purple-400">{profile.name}</span> 👋

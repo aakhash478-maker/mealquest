@@ -36,9 +36,10 @@ import {
   PlayerProfile
 } from '../types';
 import { detectFoodCategory } from '../utils/foodClassifier';
-import { generateRecommendation } from '../utils/recommendationEngine';
+import { generateRecommendation, formatServingItem, getAgeGroup } from '../utils/recommendationEngine';
 import { evaluateActualMeal } from '../utils/ratingEngine';
 import { playButtonClick, playLevelUpFanfare, playQuestFanfare } from '../utils/soundEffects';
+import { formatLocalDateTime, formatLocalDateWithWeekday, getLocalDateKey } from '../utils/dateUtils';
 import { MenuImportModal } from './MenuImportModal';
 
 const getRoleIcon = (role: FoodCategory): string => {
@@ -99,11 +100,12 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     return generateRecommendation(inventories[activeMeal] || [], profile, activeMeal, spentToday);
   });
 
-  // Actual meal logging states
+  // Actual meal logging states (Strictly separate from recommendations)
   const [structuredActualItems, setStructuredActualItems] = useState<ActualMealItem[]>([]);
   const [actualFoodText, setActualFoodText] = useState('');
   const [actualQuantity, setActualQuantity] = useState<number>(1);
-  const [actualCost, setActualCost] = useState<number>(60);
+  const [actualCost, setActualCost] = useState<number>(0);
+  const [actualLogError, setActualLogError] = useState<string>('');
   const [mealLogSuccess, setMealLogSuccess] = useState<ActualMealLog | null>(null);
 
   // Sync local items and recalculate recommendation ONLY when activeMeal tab actually changes
@@ -117,6 +119,9 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
       setMealLogSuccess(null);
       setStructuredActualItems([]);
       setActualFoodText('');
+      setActualCost(0);
+      setActualQuantity(1);
+      setActualLogError('');
     }
   }, [activeMeal, inventories, profile, spentToday]);
 
@@ -126,10 +131,10 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     setLocalItems(prev => prev.map(item => (item.id === id ? { ...item, price: validPrice } : item)));
   };
 
-  // Handle edit quantity
+  // Handle edit quantity / available stock
   const handleQuantityChange = (id: string, qty: number) => {
     const validQty = Math.max(0, isNaN(qty) ? 0 : qty);
-    setLocalItems(prev => prev.map(item => (item.id === id ? { ...item, quantity: validQty } : item)));
+    setLocalItems(prev => prev.map(item => (item.id === id ? { ...item, availableQuantity: validQty, quantity: validQty } : item)));
   };
 
   // Handle edit category
@@ -160,14 +165,16 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     const updatedLocal = localItems.map(item => {
       const match = items.find(im => im.name.toLowerCase() === item.name.toLowerCase());
       if (match) {
-        return { ...item, price: match.price, quantity: match.quantity, category: match.category };
+        const avail = match.availableQuantity ?? match.quantity ?? 1;
+        return { ...item, price: match.price, availableQuantity: avail, quantity: avail, category: match.category };
       }
       return item;
     });
 
     for (const item of items) {
       if (!existingNames.has(item.name.toLowerCase())) {
-        newOnes.push(item);
+        const avail = item.availableQuantity ?? item.quantity ?? 1;
+        newOnes.push({ ...item, availableQuantity: avail, quantity: avail });
       }
     }
 
@@ -196,11 +203,13 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
       return;
     }
 
+    const availQty = Math.max(0, newFoodQuantity);
     const newItem: FoodItem = {
       id: `${activeMeal[0]}-${Date.now()}`,
       name: newFoodName.trim(),
       price: Math.max(0, newFoodPrice),
-      quantity: Math.max(1, newFoodQuantity),
+      availableQuantity: availQty,
+      quantity: availQty,
       category: newFoodCategory
     };
 
@@ -248,24 +257,10 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     }, 80);
   };
 
-  // Structured Actual Meal Actions
-  const handleApplyRecommendedToActual = () => {
-    if (!recommendation || recommendation.items.length === 0) return;
-    playButtonClick();
-    const structured = recommendation.items.map(i => ({
-      food: i.food.name,
-      quantity: i.quantity,
-      price: i.unitPrice
-    }));
-    setStructuredActualItems(structured);
-    const summary = structured.map(i => `${i.quantity} × ${i.food}`).join(' + ');
-    setActualFoodText(summary);
-    setActualCost(recommendation.totalCost);
-    setActualQuantity(structured.reduce((acc, i) => acc + i.quantity, 0));
-  };
-
+  // Structured Actual Meal Actions (User explicitly selects what they consumed)
   const handleAddDishToActual = (food: FoodItem) => {
     playButtonClick();
+    setActualLogError('');
     setStructuredActualItems(prev => {
       const existing = prev.find(i => i.food.toLowerCase() === food.name.toLowerCase());
       let updated: ActualMealItem[];
@@ -291,6 +286,7 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
 
   const handleUpdateItemQty = (foodName: string, delta: number) => {
     playButtonClick();
+    setActualLogError('');
     setStructuredActualItems(prev => {
       const updated = prev
         .map(i => {
@@ -311,14 +307,15 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     });
   };
 
-  // Log Actual Meal
+  // Log Actual Meal (Strictly records what the player consumed)
   const handleLogActualMeal = (e: React.FormEvent) => {
     e.preventDefault();
     playButtonClick();
     if (!actualFoodText.trim()) {
-      alert('Please enter what you actually ate.');
+      setActualLogError('Please enter or select what you actually ate before logging your quest.');
       return;
     }
+    setActualLogError('');
 
     const expectedMealBudget = Math.round(profile.dailyBudget * 0.4);
     const ratingBreakdown = evaluateActualMeal(
@@ -334,12 +331,14 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     const newLog: ActualMealLog = {
       id: `log-${Date.now()}`,
       timestamp: Date.now(),
-      dateKey: new Date().toISOString().split('T')[0],
+      dateKey: getLocalDateKey(),
       mealType: activeMeal,
       recommendedSummary: recommendation && recommendation.items.length > 0
         ? recommendation.items.map(i => `${i.quantity} × ${i.food.name}`).join(' + ')
         : 'None generated',
       recommendedCost: recommendation ? recommendation.totalCost : 0,
+      recommendedGeneratedAt: recommendation ? recommendation.generatedAt : undefined,
+      recommendedItems: recommendation ? recommendation.items : undefined,
       actualFoodSummary: actualFoodText.trim(),
       actualQuantity,
       actualCost: Math.max(0, actualCost),
@@ -413,9 +412,11 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
       {/* Header & Meal Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-purple-300">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono uppercase tracking-wider text-purple-300">
             <Swords className="w-4 h-4 text-amber-400" />
             <span>CORE MEAL COMBINATION ENGINE</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-amber-300 font-semibold">{formatLocalDateWithWeekday()}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-rpg tracking-wide">
             ⚔️ Hotel Food Inventory & Decision Quest
@@ -552,6 +553,18 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
               </div>
             )}
 
+            {/* Inventory Explanation Note */}
+            <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-xs text-purple-200 flex items-start gap-2.5">
+              <HelpCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+              <div className="space-y-0.5 text-[11px] leading-relaxed">
+                <strong className="text-amber-300 font-mono">Hotel Stock vs Serving Portion: </strong>
+                <span>
+                  Hotel stock indicates how many units are available at the hotel (an availability ceiling).
+                  MealQuest recommends practical serving portions (e.g. 2–3 Idlis, 1–2 Dosas) independently based on food type, age group, meal time, and budget.
+                </span>
+              </div>
+            </div>
+
             {/* Inventory List Table */}
             {localItems.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-sm space-y-2">
@@ -566,14 +579,15 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                       <th className="pb-2 font-medium">Food Name</th>
                       <th className="pb-2 font-medium">Category / Role</th>
                       <th className="pb-2 font-medium w-24">Price (₹)</th>
-                      <th className="pb-2 font-medium w-20">Quantity</th>
-                      <th className="pb-2 font-medium w-20">Total (₹)</th>
+                      <th className="pb-2 font-medium w-28">Availability</th>
+                      <th className="pb-2 font-medium w-36 text-center">Hotel Stock Limit</th>
                       <th className="pb-2 font-medium text-right w-12">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-500/10">
                     {localItems.map(item => {
-                      const totalItemCost = item.price * item.quantity;
+                      const avail = item.availableQuantity ?? item.quantity ?? 0;
+                      const isAvailable = avail > 0;
                       let badgeColor = 'bg-slate-800 text-slate-300';
                       if (item.category === 'MAIN FOOD') badgeColor = 'bg-indigo-950/80 text-indigo-300 border-indigo-500/40';
                       else if (item.category === 'PROTEIN') badgeColor = 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40';
@@ -583,12 +597,12 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                       else if (item.category === 'FRIED / HEAVY') badgeColor = 'bg-rose-950/80 text-rose-300 border-rose-500/40';
 
                       return (
-                        <tr key={item.id} className={`hover:bg-purple-950/20 transition-colors ${item.quantity === 0 ? 'opacity-50' : ''}`}>
+                        <tr key={item.id} className={`hover:bg-purple-950/20 transition-colors ${!isAvailable ? 'opacity-60 bg-rose-950/10' : ''}`}>
                           {/* Name */}
                           <td className="py-2.5 font-bold text-white">
-                            {item.name}
-                            {item.quantity === 0 && (
-                              <span className="ml-2 text-[10px] text-rose-400 font-mono">(Out of Stock)</span>
+                            <span>{item.name}</span>
+                            {!isAvailable && (
+                              <span className="block text-[10px] text-rose-400 font-mono font-normal">Out of Stock</span>
                             )}
                           </td>
 
@@ -623,21 +637,53 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                             </div>
                           </td>
 
-                          {/* Editable Quantity */}
+                          {/* Availability Status Badge */}
                           <td className="py-2.5">
-                            <input
-                              id={`input-qty-${item.id}`}
-                              type="number"
-                              min="0"
-                              value={item.quantity}
-                              onChange={e => handleQuantityChange(item.id, parseInt(e.target.value, 10))}
-                              className="w-14 px-1.5 py-1 rounded bg-slate-900 border border-purple-500/30 text-white font-mono text-xs focus:border-amber-400 focus:outline-none"
-                            />
+                            {isAvailable ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300">
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span>Available</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-rose-950/80 border border-rose-500/40 text-rose-300">
+                                <X className="w-3 h-3 text-rose-400" />
+                                <span>Out of Stock</span>
+                              </span>
+                            )}
                           </td>
 
-                          {/* Subtotal Calculation */}
-                          <td className="py-2.5 font-mono text-amber-300 font-bold">
-                            ₹{totalItemCost}
+                          {/* Hotel Stock Limit (Editable Inventory Management Constraint) */}
+                          <td className="py-2.5">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(item.id, Math.max(0, avail - 1))}
+                                  className="w-5 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
+                                  title="Decrease available stock"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  id={`input-qty-${item.id}`}
+                                  type="number"
+                                  min="0"
+                                  value={avail}
+                                  onChange={e => handleQuantityChange(item.id, parseInt(e.target.value, 10))}
+                                  className="w-12 px-1 py-0.5 rounded bg-slate-900 border border-purple-500/30 text-white font-mono text-xs text-center focus:border-amber-400 focus:outline-none"
+                                  title="Hotel inventory quantity available"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(item.id, avail + 1)}
+                                  className="w-5 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
+                                  title="Increase available stock"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <span className="text-[9px] font-mono text-slate-500">hotel stock ceiling</span>
+                            </div>
                           </td>
 
                           {/* Delete Button */}
@@ -816,21 +862,25 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
       ) : (
         <div id="recommendation-result-container" className="space-y-4 pt-2 animate-in fade-in slide-in-from-bottom-4">
           {/* Missing main food or no practical meal available */}
-          {(recommendation.status === 'NO_MAIN_FOOD' || recommendation.status === 'NO_AVAILABLE_FOOD' || (recommendation.status === 'OVER_BUDGET' && recommendation.items.length === 0)) && (
+          {(recommendation.status === 'NO_MAIN_FOOD' || recommendation.status === 'NO_AVAILABLE_FOOD' || recommendation.status === 'NO_COMPLETE_MEAL' || (recommendation.status === 'OVER_BUDGET' && recommendation.items.length === 0)) && (
             <div className="p-6 rounded-2xl bg-amber-950/70 border-2 border-amber-500 shadow-2xl text-amber-200 space-y-3">
               <div className="flex items-center gap-2.5 text-amber-300 font-bold text-xl font-rpg">
                 <AlertTriangle className="w-7 h-7 text-amber-400 shrink-0" />
-                <span>⚠️ NO PRACTICAL MEAL AVAILABLE</span>
+                <span>
+                  {recommendation.status === 'NO_COMPLETE_MEAL'
+                    ? '⚠️ NO PRACTICAL COMPLETE MEAL AVAILABLE'
+                    : '⚠️ NO PRACTICAL MEAL AVAILABLE'}
+                </span>
               </div>
               <p className="text-base leading-relaxed text-white font-medium">
                 {recommendation.errorMessage}
               </p>
               <div className="p-4 rounded-xl bg-slate-900/90 border border-amber-500/40 text-xs sm:text-sm text-amber-200 font-mono space-y-1">
-                <strong className="text-amber-300 block font-bold">Details:</strong>
+                <strong className="text-amber-300 block font-bold">Portion & Inventory Check:</strong>
                 <span>
-                  {recommendation.whyBreakdown.mainFoodReason !== 'None available.' && recommendation.whyBreakdown.mainFoodReason}
-                  {recommendation.whyBreakdown.avoidReason && ` ${recommendation.whyBreakdown.avoidReason}`}
-                  {recommendation.whyBreakdown.budgetReason && ` ${recommendation.whyBreakdown.budgetReason}`}
+                  {recommendation.portionCheck}
+                  {recommendation.whyBreakdown.mainFoodReason !== 'None available.' && ` • ${recommendation.whyBreakdown.mainFoodReason}`}
+                  {recommendation.whyBreakdown.budgetReason && ` • ${recommendation.whyBreakdown.budgetReason}`}
                 </span>
               </div>
             </div>
@@ -841,9 +891,14 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
             <div className="p-6 sm:p-7 rounded-2xl bg-gradient-to-br from-purple-950/80 via-slate-900/95 to-indigo-950/80 border-2 border-purple-400 shadow-2xl glow-purple space-y-6">
               {/* Header Title */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-500/30">
-                <div className="flex items-center gap-2 text-sm font-mono uppercase tracking-wider text-amber-400 font-bold">
-                  <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
-                  <span>⚔️ YOUR MEAL QUEST RECOMMENDATION</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-mono uppercase tracking-wider text-amber-400 font-bold">
+                    <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                    <span>⚔️ YOUR MEAL QUEST RECOMMENDATION</span>
+                  </div>
+                  <div className="text-[11px] font-mono text-purple-300/80">
+                    Generated on: <span className="text-white font-semibold">{formatLocalDateTime(recommendation.generatedAt)}</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono uppercase px-3 py-1 rounded-full bg-purple-900/70 border border-purple-400/40 text-purple-200 font-semibold">
@@ -858,35 +913,65 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                 </div>
               </div>
 
+              {/* LIMITED PORTION WARNING BANNER */}
+              {recommendation.isLimitedPortion && recommendation.limitedPortionWarning && (
+                <div className="p-4 rounded-xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-200 shadow-xl flex items-start gap-3 animate-in fade-in">
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-xs sm:text-sm">
+                    <strong className="text-amber-300 font-bold font-mono uppercase tracking-wide block">
+                      ⚠️ LIMITED HOTEL PORTION ADVISORY
+                    </strong>
+                    <p className="leading-relaxed text-amber-100">
+                      {recommendation.limitedPortionWarning}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* PROMINENT SUGGESTION HERO BOX */}
               <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-950 via-purple-950/70 to-slate-950 border-2 border-amber-400/80 shadow-2xl space-y-4">
                 <div className="text-amber-400 font-rpg font-black text-xl sm:text-2xl tracking-wide flex items-center gap-2">
                   <span>👉 MEALQUEST SUGGESTS YOU EAT:</span>
                 </div>
 
-                <div className="space-y-3 py-1">
-                  {recommendation.items.map((selection, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-3 text-2xl sm:text-3xl font-black text-white font-rpg"
-                    >
-                      <span className="text-3xl shrink-0">{getRoleIcon(selection.role)}</span>
-                      <span className="text-amber-300">
-                        {selection.quantity} × {selection.food.name}
-                      </span>
-                    </div>
-                  ))}
+                <div className="py-2 space-y-2">
+                  <div className="text-2xl sm:text-3xl font-black text-amber-300 font-rpg tracking-wide leading-snug">
+                    {recommendation.items.map(s => formatServingItem(s.food.name, s.recommendedQuantity)).join(' + ')}
+                  </div>
+                  <div className="text-xs font-mono text-purple-200 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>
+                      Practical serving portion for a {getAgeGroup(profile.age || 21)} ({profile.age || 21} yrs) {mealTabInfo[activeMeal].subtitle} meal — based on dietary heuristics, not hotel stock level.
+                    </span>
+                  </div>
+                </div>
+
+                {/* PORTION CHECK & DECISION SUMMARY */}
+                <div className="p-3.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-xs space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-purple-500/30 pb-2">
+                    <span className="font-mono font-bold text-amber-300 uppercase flex items-center gap-1.5 text-[11px]">
+                      <span>⚖️</span>
+                      <span>PORTION CHECK</span>
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-200 bg-slate-900/90 px-2.5 py-0.5 rounded border border-purple-500/30">
+                      {recommendation.portionCheck}
+                    </span>
+                  </div>
+                  <div className="text-slate-300 leading-relaxed text-xs">
+                    <strong className="text-purple-200 font-bold block mb-0.5">Portion Decision:</strong>
+                    <p>{recommendation.portionDecision}</p>
+                  </div>
                 </div>
 
                 {/* COST & REMAINING BUDGET */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-purple-500/30">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-purple-500/30">
                   <div className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/40 flex items-center justify-between">
                     <div>
                       <span className="block text-[11px] uppercase font-mono text-slate-400 font-bold">💰 COST</span>
                       <span className="text-2xl font-black font-mono text-amber-300">₹{recommendation.totalCost}</span>
                     </div>
                     <div className="text-right text-[11px] font-mono text-slate-400">
-                      {recommendation.items.map(i => `${i.quantity}×₹${i.unitPrice}`).join(' + ')}
+                      {recommendation.items.map(i => `${i.recommendedQuantity}×₹${i.unitPrice}`).join(' + ')}
                     </div>
                   </div>
 
@@ -926,9 +1011,15 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                             <span>{getRoleIcon(selection.role)}</span>
                             <span>{selection.role}</span>
                           </span>
+                          <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            Hotel stock: {selection.availableQuantity} avail
+                          </span>
                         </div>
                         <div className="text-lg font-bold text-white mt-2">
-                          {selection.quantity} × {selection.food.name}
+                          {formatServingItem(selection.food.name, selection.recommendedQuantity)}
+                        </div>
+                        <div className="text-[11px] text-amber-300/90 font-mono mt-0.5">
+                          Suggested Serving Portion
                         </div>
                       </div>
                       <div className="mt-3 pt-2 border-t border-purple-500/20 flex justify-between items-center text-xs font-mono">
@@ -960,20 +1051,23 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                           <span className="text-2xl shrink-0 mt-0.5">{getRoleIcon(selection.role)}</span>
                           <div className="space-y-1 text-xs">
                             <div className="flex items-center gap-2">
-                              <strong className="text-white text-sm font-bold">{selection.quantity} × {selection.food.name}</strong>
+                              <strong className="text-white text-sm font-bold">
+                                {formatServingItem(selection.food.name, selection.recommendedQuantity)}
+                              </strong>
                               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 uppercase font-bold">
                                 {selection.role}
                               </span>
                             </div>
                             <p className="text-slate-300 leading-relaxed">
-                              {selection.role === 'MAIN FOOD' && 'Selected as the main/base food. '}
-                              {selection.role === 'PROTEIN' && 'Added as a protein source. '}
-                              {selection.role === 'SIDE / ACCOMPANIMENT' && 'Used as an accompaniment to the main food. '}
+                              {selection.role === 'MAIN FOOD' && 'Selected as the primary energy/base food. '}
+                              {selection.role === 'PROTEIN' && 'Added as a vital protein source. '}
+                              {selection.role === 'SIDE / ACCOMPANIMENT' && 'Used as an accompaniment to the main dish. '}
                               {selection.role === 'VEGETABLE' && 'Added for fresh vegetable nutrients & fiber. '}
                               {ir?.reason || `${selection.food.name} completes this balanced combination.`}
                             </p>
                             <div className="text-[11px] font-mono text-amber-300/90">
-                              ₹{selection.unitPrice} each × {selection.quantity} = ₹{selection.subtotal}
+                              ₹{selection.unitPrice} each × {selection.recommendedQuantity} = ₹{selection.subtotal}
+                              <span className="text-slate-400 ml-2">(Hotel Stock: {selection.availableQuantity})</span>
                             </div>
                           </div>
                         </div>
@@ -1082,7 +1176,12 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                 <span className="text-xs uppercase font-mono font-bold text-purple-300">
                   🎯 Personalization Context Evaluated
                 </span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 text-xs font-mono">
+                  <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
+                    <span className="block text-[10px] text-slate-500">🎂 Age</span>
+                    <span className="text-amber-300 font-bold">{profile.age || 21} yrs</span>
+                    <span className="text-[9px] text-slate-400 block">{getAgeGroup(profile.age || 21)}</span>
+                  </div>
                   <div className="p-2 rounded bg-slate-950/60 border border-slate-800">
                     <span className="block text-[10px] text-slate-500">📏 Height</span>
                     <span className="text-slate-200 font-bold">{profile.heightCm} cm</span>
@@ -1153,19 +1252,21 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                 </div>
               )}
 
-              {/* Quick Action to Actual Meal Log */}
+              {/* Quick Navigation to Actual Meal Log */}
               <div className="pt-4 border-t border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="text-xs text-slate-300">
-                  Did you eat this recommended combination at the hotel?
+                <div className="text-xs text-slate-300 flex items-center gap-2">
+                  <Utensils className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Recommendation is guidance. Ready to record? Enter what you actually consumed at the hotel below.</span>
                 </div>
                 <button
-                  id="btn-apply-rec-to-actual"
                   type="button"
-                  onClick={handleApplyRecommendedToActual}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-600 text-amber-300 font-bold text-xs font-rpg tracking-wider border border-purple-400 shadow-lg cursor-pointer flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+                  onClick={() => {
+                    const el = document.getElementById('actual-meal-entry-card');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-900 hover:bg-purple-900/60 text-amber-300 hover:text-white font-bold text-xs border border-purple-500/40 shadow cursor-pointer flex items-center justify-center gap-1.5 transition-all"
                 >
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>📋 USE THIS AS MY ACTUAL MEAL</span>
+                  <span>⬇️ Log What You Actually Ate</span>
                 </button>
               </div>
             </div>
@@ -1197,27 +1298,25 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
         </div>
 
         {/* Clear Guidance vs Reality distinction banner */}
-        <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 text-xs text-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/40 text-xs text-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="space-y-0.5">
-            <span className="font-bold font-mono text-amber-300 block">
-              🛡️ RECOMMENDATION vs ACTUAL MEAL:
+            <span className="font-bold font-mono text-amber-300 block flex items-center gap-1.5">
+              <span>🛡️</span>
+              <span>STRICT SEPARATION — RECOMMENDATION vs ACTUAL MEAL:</span>
             </span>
-            <span className="text-slate-300">
-              MealQuest recommended a balanced option, but you may have eaten something different at the hotel. Add the dishes below!
+            <span className="text-slate-300 leading-relaxed">
+              MealQuest recommended a balanced portion based on hotel inventory. What did you actually eat? Tap dishes from the hotel menu below or enter your exact food and spend.
             </span>
           </div>
-
-          {recommendation && recommendation.items.length > 0 && (
-            <button
-              id="btn-use-recommended-meal"
-              type="button"
-              onClick={handleApplyRecommendedToActual}
-              className="px-3 py-1.5 rounded-lg bg-purple-800 hover:bg-purple-700 text-amber-300 font-bold text-xs border border-purple-400 cursor-pointer shadow transition-all whitespace-nowrap"
-            >
-              📋 Use Recommended Combination
-            </button>
-          )}
         </div>
+
+        {/* Validation Error Banner */}
+        {actualLogError && (
+          <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs flex items-center gap-2 font-mono animate-in fade-in">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{actualLogError}</span>
+          </div>
+        )}
 
         {/* Quick-add chips from current inventory */}
         {localItems.length > 0 && (
@@ -1226,18 +1325,27 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
               Quick tap from hotel menu:
             </span>
             <div className="flex flex-wrap gap-1.5">
-              {localItems.map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleAddDishToActual(item)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-purple-900/50 border border-purple-500/30 text-xs font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3 text-purple-400" />
-                  <span>{item.name}</span>
-                  <span className="text-[10px] text-amber-300 font-mono">₹{item.price}</span>
-                </button>
-              ))}
+              {localItems.map(item => {
+                const avail = item.availableQuantity ?? item.quantity ?? 0;
+                const isOutOfStock = avail === 0;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleAddDishToActual(item)}
+                    className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+                      isOutOfStock
+                        ? 'bg-slate-900/50 hover:bg-slate-800 border-slate-800 text-slate-400'
+                        : 'bg-slate-900 hover:bg-purple-900/50 border-purple-500/30 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <Plus className="w-3 h-3 text-purple-400" />
+                    <span>{item.name}</span>
+                    <span className="text-[10px] text-amber-300 font-mono">₹{item.price}</span>
+                    {isOutOfStock && <span className="text-[9px] text-rose-400 font-mono">(Out of stock)</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

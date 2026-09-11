@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ActualMealLog, MealType } from '../types';
 import { playButtonClick } from '../utils/soundEffects';
+import { formatLocalDateTime } from '../utils/dateUtils';
 
 interface QuestLogViewProps {
   history: ActualMealLog[];
@@ -155,13 +156,7 @@ export const QuestLogView: React.FC<QuestLogViewProps> = ({
       {filteredHistory.length > 0 && (
         <div className="space-y-4">
           {filteredHistory.map(entry => {
-            const dateDisplay = new Date(entry.timestamp).toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            });
+            const dateDisplay = formatLocalDateTime(entry.timestamp);
 
             return (
               <div

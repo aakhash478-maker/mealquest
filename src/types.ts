@@ -20,12 +20,14 @@ export interface FoodItem {
   id: string;
   name: string;
   price: number;
-  quantity: number;
+  availableQuantity: number;
+  quantity?: number; // backwards compatibility alias for availableQuantity
   category: FoodCategory;
 }
 
 export interface PlayerProfile {
   name: string;
+  age: number;
   dailyBudget: number;
   heightCm: number;
   weightKg: number;
@@ -41,10 +43,12 @@ export interface PlayerProfile {
 
 export interface RecommendedItemSelection {
   food: FoodItem;
-  quantity: number;
+  recommendedQuantity: number;
+  availableQuantity: number;
   unitPrice: number;
   subtotal: number;
   role: FoodCategory;
+  quantity: number; // alias for recommendedQuantity
 }
 
 export interface MealRecommendation {
@@ -54,9 +58,15 @@ export interface MealRecommendation {
   fitsBudget: boolean;
   budgetCap: number;
   remainingDailyBudget: number;
-  status: 'SUCCESS' | 'NO_MAIN_FOOD' | 'OVER_BUDGET' | 'NO_AVAILABLE_FOOD';
+  status: 'SUCCESS' | 'NO_MAIN_FOOD' | 'OVER_BUDGET' | 'NO_AVAILABLE_FOOD' | 'NO_COMPLETE_MEAL';
   errorMessage?: string;
   recommendationScore?: number;
+  generatedAt: number;
+  portionCheck: string;
+  portionDecision: string;
+  isLimitedPortion?: boolean;
+  limitedPortionWarning?: string;
+  ageContextNote?: string;
   whyBreakdown: {
     mainFoodReason: string;
     proteinReason?: string;
@@ -72,6 +82,8 @@ export interface MealRecommendation {
   itemReasons: Array<{
     name: string;
     role: FoodCategory;
+    recommendedQuantity: number;
+    availableQuantity: number;
     quantity: number;
     subtotal: number;
     reason: string;
@@ -124,6 +136,8 @@ export interface ActualMealLog {
   mealType: MealType;
   recommendedSummary: string;
   recommendedCost: number;
+  recommendedGeneratedAt?: number;
+  recommendedItems?: RecommendedItemSelection[];
   actualFoodSummary: string;
   actualQuantity: number;
   actualCost: number;

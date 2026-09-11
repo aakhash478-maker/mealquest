@@ -16,6 +16,7 @@ import {
 import { FoodPreference, HealthCondition, PlayerProfile } from '../types';
 import { analyzeFunPower, PowerAnalysisResult } from '../utils/powerAnalyzer';
 import { playButtonClick, playQuestFanfare } from '../utils/soundEffects';
+import { getAgeGroup, getAgeGroupDescription } from '../utils/recommendationEngine';
 
 interface PlayerProfileViewProps {
   profile: PlayerProfile;
@@ -91,7 +92,7 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
                 <span>Base Identity & Food Budget</span>
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">
                     Player / Adventurer Name
@@ -104,6 +105,30 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
                     className="w-full px-3 py-2.5 rounded-lg bg-slate-900 border border-purple-500/30 text-white text-xs sm:text-sm focus:border-amber-400 focus:outline-none font-semibold"
                     required
                   />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-mono text-slate-400">
+                      Age (years)
+                    </label>
+                    <span className="text-[10px] font-mono text-amber-300 font-bold bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-500/40">
+                      {getAgeGroup(formData.age || 21)}
+                    </span>
+                  </div>
+                  <input
+                    id="input-profile-age"
+                    type="number"
+                    min="3"
+                    max="120"
+                    value={formData.age || 21}
+                    onChange={e => setFormData({ ...formData, age: Math.max(1, parseInt(e.target.value, 10) || 21) })}
+                    className="w-full px-3 py-2.5 rounded-lg bg-slate-900 border border-purple-500/30 text-white text-xs sm:text-sm font-mono font-bold focus:border-amber-400 focus:outline-none"
+                    required
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Age group: {getAgeGroup(formData.age || 21)}
+                  </p>
                 </div>
 
                 <div>
@@ -122,6 +147,18 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
                       required
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Age group guidance note */}
+              <div className="p-3 rounded-lg bg-slate-900/60 border border-purple-500/20 text-[11px] text-slate-300 flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 text-purple-400 mt-0.5 shrink-0" />
+                <div>
+                  <strong className="text-amber-300 font-mono">Age-Aware Portion Heuristic: </strong>
+                  <span>{getAgeGroupDescription(getAgeGroup(formData.age || 21))}</span>
+                  <span className="block text-[10px] text-slate-400 mt-0.5">
+                    Used for practical portion guidance (e.g. 2–3 Idlis vs 1 Dosa). Does not claim precise clinical nutrition or medical prescriptions.
+                  </span>
                 </div>
               </div>
             </div>

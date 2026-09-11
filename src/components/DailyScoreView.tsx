@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ActualMealLog, DailyScoreSummary, MealType, PlayerProfile } from '../types';
 import { playButtonClick } from '../utils/soundEffects';
+import { formatLocalDateWithWeekday } from '../utils/dateUtils';
 
 interface DailyScoreViewProps {
   dailyScore: DailyScoreSummary;
@@ -95,7 +96,7 @@ export const DailyScoreView: React.FC<DailyScoreViewProps> = ({
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold uppercase">
               <Award className="w-3.5 h-3.5" />
-              <span>TODAY'S OVERALL SCORE</span>
+              <span>TODAY'S OVERALL SCORE • {formatLocalDateWithWeekday(dailyScore.dateKey)}</span>
             </div>
 
             <h2 className="text-3xl sm:text-4xl font-black font-rpg text-white tracking-wide">
