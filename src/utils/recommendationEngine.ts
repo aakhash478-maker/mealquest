@@ -390,9 +390,9 @@ export function generateRecommendation(
       budgetCap: mealBudgetCap,
       remainingDailyBudget: remainingBudget,
       status: 'OVER_BUDGET',
-      errorMessage: `You have spent all of your daily coins (₹${spentToday} spent out of ₹${profile.dailyBudget}). Remaining budget is ₹0. Please increase your daily budget or adjust previous meal costs.`,
+      errorMessage: `You have spent all of your daily food budget (₹${spentToday} spent out of ₹${profile.dailyBudget}). Remaining budget is ₹0. Please increase your daily budget or adjust previous meal costs.`,
       generatedAt,
-      portionCheck: '0 coins remaining',
+      portionCheck: '₹0 budget remaining',
       portionDecision: 'Budget exhausted.',
       isLimitedPortion: false,
       ageContextNote: `Age: ${userAge} (${ageGroup})`,
@@ -667,8 +667,8 @@ export function generateRecommendation(
   const remainingAfterMeal = Math.max(0, remainingBudget - bestCombo.totalCost);
 
   const budgetReason = budgetFits
-    ? `Total meal cost is ₹${bestCombo.totalCost}, fitting cleanly within your remaining coin budget of ₹${remainingBudget} (leaving ₹${remainingAfterMeal} for the rest of today).`
-    : `Total cost (₹${bestCombo.totalCost}) exceeds your remaining coin budget of ₹${remainingBudget}.`;
+    ? `Total meal cost is ₹${bestCombo.totalCost}, fitting cleanly within your remaining daily budget of ₹${remainingBudget} (leaving ₹${remainingAfterMeal} for the rest of today).`
+    : `Total cost (₹${bestCombo.totalCost}) exceeds your remaining daily budget of ₹${remainingBudget}.`;
 
   const portionCheckParts = bestCombo.items.map(
     i => `${formatServingItem(i.food.name, i.recommendedQuantity)} recommended`

@@ -9,9 +9,7 @@ import {
   Check,
   X,
   AlertCircle,
-  Edit2,
-  Sparkles,
-  Plus
+  Sparkles
 } from 'lucide-react';
 import { FoodCategory, FoodItem } from '../types';
 import { ParsedMenuItem, parseMenuText } from '../utils/menuParser';
@@ -71,56 +69,51 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
     handleParseAndReview(pasteText);
   };
 
-  // Sample quick load for testing
+  // Quick sample loader
   const handleLoadSample = (sample: string) => {
+    playButtonClick();
     setPasteText(sample);
-    handleParseAndReview(sample);
   };
 
-  // File Upload handler (.txt, .csv, .json, .png, .jpg)
+  // File upload handler (simulates OCR/document reading into text)
   const handleFileUpload = (file: File) => {
+    playButtonClick();
     setUploadedFileName(file.name);
-    setErrorMessage('');
 
     if (file.type.startsWith('image/')) {
-      // Read image preview
+      const url = URL.createObjectURL(file);
+      setImagePreviewUrl(url);
+
+      // Extract typical dish suggestions or read if text-based
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreviewUrl(e.target?.result as string);
+      reader.onload = () => {
+        // Mock extract for demo preview or parse file if text
+        setTimeout(() => {
+          handleParseAndReview(`Dosa - ₹35\nIdli - ₹10\nPoori - ₹40\nTea - ₹12\nCoffee - ₹15`);
+        }, 600);
       };
       reader.readAsDataURL(file);
-
-      // Extract filename or simulated menu items if OCR unavailable
-      const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      // Default extraction prompt for uploaded image
-      const simulatedOcr = `Dosa - ₹30\nIdli - ₹10\nVada - ₹15\nPongal - ₹35\nTea - ₹12\nSambar - ₹20\nCurd - ₹15`;
-      setPasteText(simulatedOcr);
-      handleParseAndReview(simulatedOcr);
     } else {
       // Text or CSV file
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        setPasteText(content);
-        handleParseAndReview(content);
-      };
-      reader.onerror = () => {
-        setErrorMessage('Failed to read file. Please paste menu text directly.');
+      reader.onload = event => {
+        const text = event.target?.result as string;
+        if (text) {
+          handleParseAndReview(text);
+        }
       };
       reader.readAsText(file);
     }
   };
 
-  // Voice Recognition handler
+  // Voice recognition toggle
   const handleToggleVoice = () => {
     playButtonClick();
-
-    // Check browser speech recognition support
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       setVoiceSupported(false);
-      setErrorMessage('Voice input is not supported in this browser. Please use manual entry or paste the menu.');
       return;
     }
 
@@ -129,123 +122,115 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
         recognitionRef.current.stop();
       }
       setIsRecording(false);
-      return;
-    }
+    } else {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-IN';
 
-    try {
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-IN';
+        recognition.onresult = (event: any) => {
+          let current = '';
+          for (let i = 0; i < event.results.length; i++) {
+            current += event.results[i][0].transcript + ' ';
+          }
+          setVoiceTranscript(current);
+        };
 
-      recognition.onstart = () => {
+        recognition.onerror = () => {
+          setIsRecording(false);
+        };
+
+        recognition.onend = () => {
+          setIsRecording(false);
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
         setIsRecording(true);
-        setErrorMessage('');
-      };
-
-      recognition.onresult = (event: any) => {
-        let current = '';
-        for (let i = 0; i < event.results.length; i++) {
-          current += event.results[i][0].transcript + ' ';
-        }
-        setVoiceTranscript(current);
-        setPasteText(current);
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
+      } catch (err) {
         setIsRecording(false);
-        if (event.error === 'not-allowed') {
-          setErrorMessage('Microphone access was denied. Please allow microphone permissions or use paste menu.');
-        } else {
-          setErrorMessage(`Voice error: ${event.error}. Please try typing or pasting.`);
-        }
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-
-      recognition.start();
-    } catch (err) {
-      setVoiceSupported(false);
-      setErrorMessage('Voice input is not supported in this browser. Please use manual entry or paste the menu.');
+        setVoiceSupported(false);
+      }
     }
   };
 
-  // Toggle item selection in review
-  const handleToggleSelectItem = (id: string) => {
-    setParsedItems(prev =>
-      prev.map(item => (item.id === id ? { ...item, selected: !item.selected } : item))
-    );
-  };
-
-  // Edit item in review
+  // Update item in review list
   const handleUpdateItem = (id: string, updates: Partial<ParsedMenuItem>) => {
     setParsedItems(prev =>
-      prev.map(item => (item.id === id ? { ...item, ...updates } : item))
+      prev.map(i => (i.id === id ? { ...i, ...updates } : i))
     );
   };
 
-  // Confirm and Add to Inventory
+  // Toggle selection
+  const handleToggleSelectItem = (id: string) => {
+    setParsedItems(prev =>
+      prev.map(i => (i.id === id ? { ...i, selected: !i.selected } : i))
+    );
+  };
+
+  // Confirm and add to parent inventory
   const handleConfirmAdd = () => {
     playButtonClick();
-    const itemsToAdd: FoodItem[] = parsedItems
-      .filter(item => item.selected && item.name.trim())
-      .map(item => ({
-        id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        name: item.name.trim(),
-        price: Math.max(0, item.price),
-        category: item.category
-      }));
-
-    if (itemsToAdd.length === 0) {
-      setErrorMessage('Please select at least one valid item to add.');
+    const selected = parsedItems.filter(i => i.selected);
+    if (selected.length === 0) {
+      setErrorMessage('Please select at least one food item to import.');
       return;
     }
+
+    const itemsToAdd: FoodItem[] = selected.map(i => ({
+      id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: i.name.trim(),
+      price: Math.max(0, i.price),
+      category: i.category
+    }));
 
     onAddItems(itemsToAdd);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in">
-      <div className="max-w-2xl w-full p-6 rounded-2xl bg-[#1d213b] border-2 border-purple-500/40 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-purple-500/20">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-mono uppercase text-amber-400 font-bold">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>SMART MENU ACQUISITION</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+      <div className="max-w-2xl w-full p-6 rounded-2xl bg-white dark:bg-[#161522] border border-purple-200 dark:border-purple-900/50 shadow-2xl space-y-5 transition-colors">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-950/60 flex items-center justify-center text-purple-700 dark:text-purple-400">
+              <Sparkles className="w-4 h-4" />
             </div>
-            <h2 className="text-xl font-bold font-rpg text-white">
-              Import Food Menu for {mealTitle}
-            </h2>
+            <div>
+              <h3 className="text-lg font-bold font-rpg text-slate-900 dark:text-slate-100">
+                Smart Menu Import
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Populate {mealTitle} hotel inventory using paste, photo, file, or voice.
+              </p>
+            </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* REVIEW SCREEN vs INPUT SCREEN */}
+        {/* Modal Body */}
         {isReviewing ? (
-          /* ================= REVIEW SCREEN ================= */
-          <div className="space-y-4 animate-in fade-in">
-            <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/30 flex items-center justify-between">
+          /* ================= REVIEW EXTRACTED ITEMS SCREEN ================= */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/50">
               <div>
-                <span className="text-xs font-mono text-amber-300 font-bold uppercase block">
+                <span className="text-xs font-mono text-purple-900 dark:text-purple-300 font-bold uppercase block">
                   ✓ MENU DETECTED
                 </span>
-                <p className="text-xs text-slate-300">
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   Review extracted dishes, prices, and categories before adding to your {mealTitle} inventory.
                 </p>
               </div>
-              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-purple-900 text-purple-200 border border-purple-400/40">
+              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-white dark:bg-[#161522] text-purple-900 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 font-bold shadow-2xs">
                 {parsedItems.filter(i => i.selected).length} selected
               </span>
             </div>
@@ -257,8 +242,8 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                   key={item.id}
                   className={`p-3 rounded-xl border transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     item.selected
-                      ? 'bg-[#24294a] border-purple-500/40'
-                      : 'bg-[#181b30]/60 border-slate-800 opacity-60'
+                      ? 'bg-purple-50/40 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800/50'
+                      : 'bg-slate-50 dark:bg-[#1E1D2D] border-slate-200 dark:border-slate-800 opacity-60'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -266,26 +251,26 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                       type="checkbox"
                       checked={item.selected}
                       onChange={() => handleToggleSelectItem(item.id)}
-                      className="w-4 h-4 rounded text-purple-600 bg-slate-900 border-purple-500/40 cursor-pointer focus:ring-0"
+                      className="w-4 h-4 rounded text-purple-600 border-slate-300 dark:border-slate-700 cursor-pointer focus:ring-0"
                     />
 
                     <input
                       type="text"
                       value={item.name}
                       onChange={e => handleUpdateItem(item.id, { name: e.target.value })}
-                      className="px-2 py-1 rounded bg-[#16192d] border border-purple-500/30 text-white font-bold text-xs sm:text-sm focus:border-amber-400 focus:outline-none w-44 sm:w-52"
+                      className="px-2 py-1 rounded-lg bg-white dark:bg-[#1E1D2D] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-sm focus:border-purple-600 focus:outline-none w-44 sm:w-52"
                     />
                   </div>
 
                   <div className="flex items-center gap-2 text-xs font-mono">
                     <div className="flex items-center">
-                      <span className="text-slate-400 mr-1">₹</span>
+                      <span className="text-slate-500 dark:text-slate-400 mr-1 font-bold">₹</span>
                       <input
                         type="number"
                         min="0"
                         value={item.price}
                         onChange={e => handleUpdateItem(item.id, { price: parseFloat(e.target.value) || 0 })}
-                        className="w-20 px-1.5 py-1 rounded bg-[#16192d] border border-purple-500/30 text-amber-300 font-bold focus:border-amber-400 focus:outline-none"
+                        className="w-20 px-1.5 py-1 rounded-lg bg-white dark:bg-[#1E1D2D] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold focus:border-purple-600 focus:outline-none"
                         title="Price"
                       />
                     </div>
@@ -293,7 +278,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                     <select
                       value={item.category}
                       onChange={e => handleUpdateItem(item.id, { category: e.target.value as FoodCategory })}
-                      className="px-2 py-1 rounded bg-[#16192d] border border-purple-500/30 text-[11px] text-purple-300 focus:border-amber-400 focus:outline-none"
+                      className="px-2 py-1 rounded-lg bg-white dark:bg-[#1E1D2D] border border-slate-300 dark:border-slate-700 text-[11px] text-slate-800 dark:text-slate-200 focus:border-purple-600 focus:outline-none cursor-pointer font-sans"
                     >
                       <option value="MAIN FOOD">MAIN</option>
                       <option value="PROTEIN">PROTEIN</option>
@@ -308,18 +293,18 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
             </div>
 
             {errorMessage && (
-              <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
-            {/* Actions: EDIT, ADD TO INVENTORY, CANCEL */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-purple-500/20">
+            {/* Actions: BACK, CANCEL, ADD TO INVENTORY */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setIsReviewing(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer transition-colors"
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer transition-colors"
               >
                 ← Back to Input
               </button>
@@ -328,7 +313,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-400 text-xs font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-white dark:bg-[#161522] border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold cursor-pointer"
                 >
                   CANCEL
                 </button>
@@ -337,7 +322,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                   id="btn-add-imported-to-inventory"
                   type="button"
                   onClick={handleConfirmAdd}
-                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-rpg font-bold text-xs tracking-wider border border-emerald-400 shadow-lg glow-green cursor-pointer flex items-center gap-1.5"
+                  className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-rpg font-bold text-xs tracking-wider shadow-xs cursor-pointer flex items-center gap-1.5"
                 >
                   <Check className="w-4 h-4" />
                   <span>ADD TO INVENTORY</span>
@@ -358,11 +343,11 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                 }}
                 className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'paste'
-                    ? 'bg-purple-900/60 border-purple-400 text-white shadow-md'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-300 dark:border-purple-800/80 text-purple-900 dark:text-purple-300 shadow-2xs'
+                    : 'bg-white dark:bg-[#161522] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Clipboard className="w-4 h-4 text-purple-400" />
+                <Clipboard className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span>📋 Paste Menu</span>
               </button>
 
@@ -374,11 +359,11 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                 }}
                 className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'image'
-                    ? 'bg-purple-900/60 border-purple-400 text-white shadow-md'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-300 dark:border-purple-800/80 text-purple-900 dark:text-purple-300 shadow-2xs'
+                    : 'bg-white dark:bg-[#161522] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Camera className="w-4 h-4 text-amber-400" />
+                <Camera className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span>📷 Upload Image</span>
               </button>
 
@@ -390,11 +375,11 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                 }}
                 className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'file'
-                    ? 'bg-purple-900/60 border-purple-400 text-white shadow-md'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-300 dark:border-purple-800/80 text-purple-900 dark:text-purple-300 shadow-2xs'
+                    : 'bg-white dark:bg-[#161522] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <FileText className="w-4 h-4 text-indigo-400" />
+                <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span>📄 Upload File</span>
               </button>
 
@@ -406,11 +391,11 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                 }}
                 className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'voice'
-                    ? 'bg-purple-900/60 border-purple-400 text-white shadow-md'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+                    ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-300 dark:border-purple-800/80 text-purple-900 dark:text-purple-300 shadow-2xs'
+                    : 'bg-white dark:bg-[#161522] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Mic className="w-4 h-4 text-emerald-400" />
+                <Mic className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span>🎤 Voice Input</span>
               </button>
             </div>
@@ -419,7 +404,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
             {activeTab === 'paste' && (
               <form onSubmit={handlePasteSubmit} className="space-y-3">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Paste hotel menu text, board items, or prices:
                   </label>
                   <textarea
@@ -427,24 +412,24 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                     value={pasteText}
                     onChange={e => setPasteText(e.target.value)}
                     placeholder={`Idli - ₹10\nDosa - ₹30\nVada - ₹15\nEgg - ₹10\nPongal - ₹35\nTea - ₹12`}
-                    className="w-full p-3 rounded-xl bg-slate-950 border border-purple-500/30 text-white font-mono text-xs focus:border-amber-400 focus:outline-none leading-relaxed"
+                    className="w-full p-3 rounded-xl bg-white dark:bg-[#1E1D2D] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-mono text-xs focus:border-purple-600 focus:outline-none leading-relaxed"
                   />
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span className="text-slate-500">Quick Samples:</span>
+                  <span className="text-slate-500 dark:text-slate-400">Quick Samples:</span>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => handleLoadSample("Idli - ₹10\nDosa - ₹35\nVada - ₹15\nEgg - ₹10\nTea - ₹12")}
-                      className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-purple-300 hover:text-white cursor-pointer"
+                      className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-purple-800 dark:text-purple-300 font-medium cursor-pointer"
                     >
                       Breakfast Sample
                     </button>
                     <button
                       type="button"
                       onClick={() => handleLoadSample("Rice - ₹30\nSambar - ₹20\nPoriyal - ₹20\nEgg - ₹10\nChicken - ₹70\nCurd - ₹15")}
-                      className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-purple-300 hover:text-white cursor-pointer"
+                      className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-purple-800 dark:text-purple-300 font-medium cursor-pointer"
                     >
                       Lunch Sample
                     </button>
@@ -453,7 +438,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-rpg font-bold text-xs tracking-wider shadow-md cursor-pointer transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 dark:bg-purple-600 dark:hover:bg-purple-500 text-white font-rpg font-bold text-xs tracking-wider shadow-xs cursor-pointer transition-all flex items-center justify-center gap-2"
                 >
                   <Sparkles className="w-4 h-4 text-amber-300" />
                   <span>PROCESS & REVIEW MENU</span>
@@ -464,7 +449,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
             {/* 2. IMAGE TAB */}
             {activeTab === 'image' && (
               <div className="space-y-4 text-center">
-                <div className="p-6 rounded-xl border-2 border-dashed border-purple-500/40 hover:border-purple-400 bg-slate-950/60 transition-colors flex flex-col items-center justify-center space-y-3 cursor-pointer relative">
+                <div className="p-6 rounded-xl border-2 border-dashed border-purple-200 dark:border-purple-800/80 hover:border-purple-400 dark:hover:border-purple-600 bg-purple-50/20 dark:bg-purple-950/20 transition-colors flex flex-col items-center justify-center space-y-3 cursor-pointer relative">
                   <input
                     type="file"
                     accept="image/*"
@@ -473,22 +458,22 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                     }}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
-                  <div className="w-12 h-12 rounded-full bg-purple-900/40 border border-purple-500/30 flex items-center justify-center text-amber-400">
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-950/60 flex items-center justify-center text-purple-700 dark:text-purple-400">
                     <Camera className="w-6 h-6" />
                   </div>
                   <div>
-                    <strong className="text-white text-sm block">Upload Menu Screenshot or Photo</strong>
-                    <span className="text-slate-400 text-xs">Supports JPG, PNG, WEBP files</span>
+                    <strong className="text-slate-900 dark:text-slate-100 text-sm block font-bold">Upload Menu Screenshot or Photo</strong>
+                    <span className="text-slate-500 dark:text-slate-400 text-xs">Supports JPG, PNG, WEBP files</span>
                   </div>
                 </div>
 
                 {imagePreviewUrl && (
-                  <div className="p-2 rounded-xl bg-slate-900 border border-purple-500/30 max-h-36 overflow-hidden flex items-center justify-center">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-[#1E1D2D] border border-slate-200 dark:border-slate-700 max-h-36 overflow-hidden flex items-center justify-center">
                     <img src={imagePreviewUrl} alt="Menu preview" className="max-h-32 rounded object-contain" />
                   </div>
                 )}
 
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Image recognition will scan for dish names and price tags, and present a review list before saving.
                 </p>
               </div>
@@ -497,7 +482,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
             {/* 3. FILE TAB */}
             {activeTab === 'file' && (
               <div className="space-y-4 text-center">
-                <div className="p-6 rounded-xl border-2 border-dashed border-purple-500/40 hover:border-purple-400 bg-slate-950/60 transition-colors flex flex-col items-center justify-center space-y-3 cursor-pointer relative">
+                <div className="p-6 rounded-xl border-2 border-dashed border-purple-200 dark:border-purple-800/80 hover:border-purple-400 dark:hover:border-purple-600 bg-purple-50/20 dark:bg-purple-950/20 transition-colors flex flex-col items-center justify-center space-y-3 cursor-pointer relative">
                   <input
                     type="file"
                     accept=".txt,.csv,.json,image/*"
@@ -506,17 +491,17 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                     }}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
-                  <div className="w-12 h-12 rounded-full bg-indigo-900/40 border border-indigo-500/30 flex items-center justify-center text-indigo-300">
+                  <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-700 dark:text-indigo-400">
                     <Upload className="w-6 h-6" />
                   </div>
                   <div>
-                    <strong className="text-white text-sm block">Select Menu File</strong>
-                    <span className="text-slate-400 text-xs">Upload TXT, CSV, or document file</span>
+                    <strong className="text-slate-900 dark:text-slate-100 text-sm block font-bold">Select Menu File</strong>
+                    <span className="text-slate-500 dark:text-slate-400 text-xs">Upload TXT, CSV, or document file</span>
                   </div>
                 </div>
 
                 {uploadedFileName && (
-                  <div className="text-xs text-purple-300 font-mono">
+                  <div className="text-xs text-purple-800 dark:text-purple-300 font-mono font-semibold">
                     Selected: {uploadedFileName}
                   </div>
                 )}
@@ -527,8 +512,8 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
             {activeTab === 'voice' && (
               <div className="space-y-4 text-center py-2">
                 {!voiceSupported ? (
-                  <div className="p-4 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-200 text-xs space-y-2">
-                    <AlertCircle className="w-6 h-6 text-amber-400 mx-auto" />
+                  <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-xs space-y-2">
+                    <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 mx-auto" />
                     <p className="font-semibold">
                       Voice input is not supported in this browser. Please use manual entry or paste the menu.
                     </p>
@@ -539,19 +524,19 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                       <button
                         type="button"
                         onClick={handleToggleVoice}
-                        className={`w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xl ${
+                        className={`w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
                           isRecording
-                            ? 'bg-rose-600 text-white animate-pulse glow-rose border-2 border-white'
-                            : 'bg-purple-700 hover:bg-purple-600 text-white border-2 border-purple-400 glow-purple'
+                            ? 'bg-rose-600 text-white animate-pulse'
+                            : 'bg-purple-700 hover:bg-purple-800 text-white'
                         }`}
                       >
                         {isRecording ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
                       </button>
                     </div>
 
-                    <div className="text-xs text-slate-300">
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
                       {isRecording ? (
-                        <span className="text-rose-400 font-bold animate-pulse">
+                        <span className="text-rose-600 dark:text-rose-400 font-bold animate-pulse">
                           🔴 Listening... Speak clearly (e.g. "Dosa 30 rupees, idli 10 rupees, egg 10 rupees")
                         </span>
                       ) : (
@@ -560,9 +545,9 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                     </div>
 
                     {voiceTranscript && (
-                      <div className="p-3 rounded-xl bg-slate-950 border border-purple-500/30 text-xs font-mono text-left max-h-24 overflow-y-auto">
-                        <span className="text-[10px] text-slate-500 block">Transcript:</span>
-                        <span className="text-white">{voiceTranscript}</span>
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#1E1D2D] border border-slate-200 dark:border-slate-800 text-xs font-mono text-left max-h-24 overflow-y-auto">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Transcript:</span>
+                        <span className="text-slate-900 dark:text-slate-100">{voiceTranscript}</span>
                       </div>
                     )}
 
@@ -570,7 +555,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleParseAndReview(voiceTranscript)}
-                        className="px-6 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-rpg font-bold text-xs tracking-wider cursor-pointer shadow-md"
+                        className="px-6 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-rpg font-bold text-xs tracking-wider cursor-pointer shadow-xs"
                       >
                         PROCESS SPOKEN MENU
                       </button>
@@ -581,8 +566,8 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
             )}
 
             {errorMessage && (
-              <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
                 <span>{errorMessage}</span>
               </div>
             )}

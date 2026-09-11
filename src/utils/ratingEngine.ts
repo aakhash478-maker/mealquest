@@ -66,7 +66,7 @@ export function evaluateActualMeal(
   if (hasProtein) {
     proteinScore = 2.0;
   } else if (!proteinWasAvailable) {
-    proteinScore = 2.0; // Grace: hotel did not have protein in stock
+    proteinScore = 2.0; // Grace: hotel did not have protein on the menu
   } else {
     proteinScore = (profile.foodPreference === 'Vegetarian' && hasSide) ? 1.5 : 1.0;
   }
@@ -84,10 +84,10 @@ export function evaluateActualMeal(
   if (hasProtein) {
     positivePoints.push('Included an effective protein source to aid recovery and fullness.');
   } else if (!proteinWasAvailable) {
-    positivePoints.push('Fairly rated based on available hotel menu (no protein items were in stock).');
+    positivePoints.push('Fairly rated based on available hotel menu (no protein items were on the hotel menu).');
   }
   if (hasVeg || hasSide) positivePoints.push('Added variety with vegetable or flavorful side accompaniment.');
-  if (actualCost <= expectedMealBudget) positivePoints.push(`Stayed strictly within practical meal coin budget (₹${actualCost} <= ₹${expectedMealBudget}).`);
+  if (actualCost <= expectedMealBudget) positivePoints.push(`Stayed strictly within practical meal budget (₹${actualCost} <= ₹${expectedMealBudget}).`);
 
   // Penalties
   if (!hasMain) {
@@ -156,7 +156,7 @@ export function evaluateActualMeal(
   if (constructivePoints.length > 0) {
     narrative += constructivePoints[0];
   } else {
-    narrative += 'Solid practical meal execution that respected your physical profile and coin pouch!';
+    narrative += 'Solid practical meal execution that respected your physical profile and food budget!';
   }
 
   return {
@@ -187,7 +187,7 @@ export function evaluateActualMeal(
       notes: `Entered quantity: ${actualQuantity}`
     },
     budget: {
-      label: 'Coin Budget Fit',
+      label: 'Food Budget Fit',
       score: budgetScore,
       max: 2.0,
       notes: `₹${actualCost} spent (Target: ₹${expectedMealBudget})`
@@ -258,7 +258,7 @@ export function calculateDailyOverallScore(
   }
 
   if (totalSpent <= dailyBudget) {
-    why += `Overall coin spending remained well controlled (₹${totalSpent} spent of ₹${dailyBudget}).`;
+    why += `Overall food spending remained well controlled (₹${totalSpent} spent of ₹${dailyBudget}).`;
   } else {
     why += `Daily food spending exceeded your planned budget by ₹${totalSpent - dailyBudget}.`;
   }

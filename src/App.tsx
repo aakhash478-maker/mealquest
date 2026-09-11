@@ -104,7 +104,7 @@ export default function App() {
     return calculateRealStreak(mealHistory);
   }, [mealHistory]);
 
-  const remainingCoins = Math.max(0, profile.dailyBudget - dailyScore.totalSpentToday);
+  const remainingBudget = Math.max(0, profile.dailyBudget - dailyScore.totalSpentToday);
 
   const handleSelectMealQuestFromHome = (meal: MealType) => {
     setSelectedMealQuest(meal);
@@ -116,13 +116,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#131627] text-slate-100 flex flex-col font-sans selection:bg-purple-600 selection:text-white">
+    <div className="min-h-screen bg-[#F8F7FC] dark:bg-[#0F0E17] text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-purple-600 selection:text-white transition-colors duration-200">
       {/* Navigation HUD */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         profile={profile}
-        remainingCoins={remainingCoins}
+        remainingBudget={remainingBudget}
       />
 
       {/* Main View Area */}
@@ -180,26 +180,26 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-purple-500/20 bg-[#0f1224] py-6 px-4 text-center text-xs text-slate-400">
+      <footer className="w-full border-t border-purple-100 dark:border-purple-900/40 bg-white dark:bg-[#161522] py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400 shadow-xs transition-colors duration-200">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-epic text-amber-300 font-bold">MEALQUEST</span>
+            <span className="font-epic text-purple-900 dark:text-purple-300 font-bold">MEALQUEST</span>
             <span>•</span>
             <span>Personal Food Decision Assistant</span>
           </div>
 
-          <div className="text-slate-400">
-            Hotel Meal Balance & Budget Navigator
+          <div className="text-slate-600 dark:text-slate-400">
+            Hotel Meal Balance & Daily Budget Guide
           </div>
 
-          <div className="flex items-center gap-4 text-slate-500">
+          <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400">
             <button
               onClick={() => setShowSplash(true)}
-              className="hover:text-amber-300 underline cursor-pointer"
+              className="hover:text-purple-700 dark:hover:text-purple-300 underline cursor-pointer"
             >
               Opening Screen
             </button>
-            <span>v1.0 Responsive RPG</span>
+            <span>v1.0 Ready</span>
           </div>
         </div>
       </footer>
