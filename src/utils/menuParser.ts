@@ -5,7 +5,6 @@ export interface ParsedMenuItem {
   id: string;
   name: string;
   price: number;
-  quantity: number;
   category: FoodCategory;
   selected: boolean;
 }
@@ -51,14 +50,12 @@ function parseSingleLine(line: string, id: string): ParsedMenuItem | null {
   const priceRegex = /(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:₹|rs\.?|inr|rupees|bucks)?/i;
 
   let price = 20; // default reasonable fallback
-  let quantity = 1;
   let cleanName = trimmed;
 
-  // Check for quantity prefix like "2 x Dosa" or "2 Dosa"
+  // Strip quantity prefix like "2 x Dosa" or "2 Dosa" to get clean dish name
   const qtyPrefixRegex = /^(\d+)\s*(?:x|\*|-)?\s+([a-zA-Z\s]+)/i;
   const qtyMatch = cleanName.match(qtyPrefixRegex);
   if (qtyMatch) {
-    quantity = Math.max(1, parseInt(qtyMatch[1], 10));
     cleanName = cleanName.replace(qtyPrefixRegex, '$2');
   }
 
@@ -104,7 +101,6 @@ function parseSingleLine(line: string, id: string): ParsedMenuItem | null {
     id,
     name: formattedName,
     price: Math.max(0, price),
-    quantity: Math.max(1, quantity),
     category,
     selected: true
   };

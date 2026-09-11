@@ -197,7 +197,6 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
         id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: item.name.trim(),
         price: Math.max(0, item.price),
-        quantity: Math.max(1, item.quantity),
         category: item.category
       }));
 
@@ -211,8 +210,8 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="max-w-2xl w-full p-6 rounded-2xl bg-[#101020] border-2 border-purple-500/50 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in">
+      <div className="max-w-2xl w-full p-6 rounded-2xl bg-[#1d213b] border-2 border-purple-500/40 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-purple-500/20">
           <div>
@@ -258,8 +257,8 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                   key={item.id}
                   className={`p-3 rounded-xl border transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     item.selected
-                      ? 'bg-slate-900/90 border-purple-500/40'
-                      : 'bg-slate-950/40 border-slate-800 opacity-60'
+                      ? 'bg-[#24294a] border-purple-500/40'
+                      : 'bg-[#181b30]/60 border-slate-800 opacity-60'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -274,7 +273,7 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                       type="text"
                       value={item.name}
                       onChange={e => handleUpdateItem(item.id, { name: e.target.value })}
-                      className="px-2 py-1 rounded bg-slate-950 border border-purple-500/30 text-white font-bold text-xs sm:text-sm focus:border-amber-400 focus:outline-none w-36 sm:w-44"
+                      className="px-2 py-1 rounded bg-[#16192d] border border-purple-500/30 text-white font-bold text-xs sm:text-sm focus:border-amber-400 focus:outline-none w-44 sm:w-52"
                     />
                   </div>
 
@@ -286,27 +285,15 @@ export const MenuImportModal: React.FC<MenuImportModalProps> = ({
                         min="0"
                         value={item.price}
                         onChange={e => handleUpdateItem(item.id, { price: parseFloat(e.target.value) || 0 })}
-                        className="w-16 px-1.5 py-1 rounded bg-slate-950 border border-purple-500/30 text-amber-300 font-bold focus:border-amber-400 focus:outline-none"
+                        className="w-20 px-1.5 py-1 rounded bg-[#16192d] border border-purple-500/30 text-amber-300 font-bold focus:border-amber-400 focus:outline-none"
                         title="Price"
-                      />
-                    </div>
-
-                    <div className="flex items-center">
-                      <span className="text-slate-500 mr-1">Qty:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={e => handleUpdateItem(item.id, { quantity: parseInt(e.target.value, 10) || 1 })}
-                        className="w-12 px-1.5 py-1 rounded bg-slate-950 border border-purple-500/30 text-white focus:border-amber-400 focus:outline-none text-center"
-                        title="Available Quantity"
                       />
                     </div>
 
                     <select
                       value={item.category}
                       onChange={e => handleUpdateItem(item.id, { category: e.target.value as FoodCategory })}
-                      className="px-2 py-1 rounded bg-slate-950 border border-purple-500/30 text-[11px] text-purple-300 focus:border-amber-400 focus:outline-none"
+                      className="px-2 py-1 rounded bg-[#16192d] border border-purple-500/30 text-[11px] text-purple-300 focus:border-amber-400 focus:outline-none"
                     >
                       <option value="MAIN FOOD">MAIN</option>
                       <option value="PROTEIN">PROTEIN</option>

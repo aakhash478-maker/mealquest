@@ -62,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header
       id="main-nav-header"
-      className="sticky top-0 z-40 w-full border-b border-purple-500/20 bg-[#0c0e18]/90 backdrop-blur-md"
+      className="sticky top-0 z-40 w-full border-b border-purple-400/25 bg-[#181d36]/95 backdrop-blur-md"
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
         {/* Brand logo & title */}
@@ -163,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Nav Dropdown */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-purple-500/20 bg-[#0d0e1a]/95 px-4 py-3 space-y-1.5 shadow-2xl animate-in slide-in-from-top-2">
+        <div className="md:hidden border-t border-purple-500/20 bg-[#181d36]/98 px-4 py-3 space-y-1.5 shadow-2xl animate-in slide-in-from-top-2">
           {navItems.map(item => {
             const isActive = activeTab === item.id;
             return (

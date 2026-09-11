@@ -116,7 +116,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#090a12] text-slate-100 flex flex-col font-sans selection:bg-purple-600 selection:text-white">
+    <div className="min-h-screen bg-[#131627] text-slate-100 flex flex-col font-sans selection:bg-purple-600 selection:text-white">
       {/* Navigation HUD */}
       <Navbar
         activeTab={activeTab}
@@ -180,7 +180,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-purple-500/20 bg-[#070810] py-6 px-4 text-center text-xs text-slate-500">
+      <footer className="w-full border-t border-purple-500/20 bg-[#0f1224] py-6 px-4 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-epic text-amber-300 font-bold">MEALQUEST</span>

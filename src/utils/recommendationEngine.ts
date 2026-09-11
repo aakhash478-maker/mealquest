@@ -86,8 +86,6 @@ export interface PracticalServingInfo {
   standardMax: number;
   typicalUnitDescription: string;
   candidateQuantities: number[];
-  isLowAvailability: boolean;
-  isCompletelyOutOfStock: boolean;
   portionRationale: string;
 }
 
@@ -98,8 +96,7 @@ export interface PracticalServingInfo {
  * - User's age & broad age group
  * - Current condition (e.g. illness / sensitive stomach)
  *
- * CRITICAL DIRECTIVE: Available inventory quantity acts STRICTLY as an availability constraint,
- * NEVER as the recommended portion size!
+ * NOTE: There is NO hotel stock limit. Availability is binary (present in inventory = available).
  */
 export function getPracticalServingInfo(
   food: FoodItem,
@@ -108,13 +105,6 @@ export function getPracticalServingInfo(
   isIll: boolean
 ): PracticalServingInfo {
   const name = food.name.toLowerCase();
-  const available = Math.max(
-    0,
-    typeof food.availableQuantity === 'number'
-      ? food.availableQuantity
-      : (typeof food.quantity === 'number' ? food.quantity : 0)
-  );
-
   const ageGroup = getAgeGroup(age || 21);
 
   let standardMin = 1;
@@ -123,38 +113,38 @@ export function getPracticalServingInfo(
   let typicalUnitDescription = '1 serving';
 
   if (name.includes('idli')) {
-    if (ageGroup === 'Child') {
+    if (ageGroup === 'Child' || ageGroup === 'Older adult' || isIll) {
       standardMin = 1;
       standardIdeal = 2;
       standardMax = 2;
-    } else if (ageGroup === 'Older adult') {
+    } else if (ageGroup === 'Teen') {
+      standardMin = 2;
+      standardIdeal = 3;
+      standardMax = 3;
+    } else {
+      // Young adult, Adult
       standardMin = 2;
       standardIdeal = 2;
-      standardMax = 2;
-    } else {
-      // Teen, Young adult, Adult
-      standardMin = 2;
-      standardIdeal = mealType === 'night' || isIll ? 2 : (ageGroup === 'Teen' ? 3 : 2);
       standardMax = 3;
     }
     typicalUnitDescription = '2–3 Idlis';
   } else if (name.includes('poori') || name.includes('puri')) {
-    if (ageGroup === 'Child') {
-      standardMin = 1;
-      standardIdeal = 2;
-      standardMax = 2;
-    } else if (ageGroup === 'Older adult') {
+    if (ageGroup === 'Child' || ageGroup === 'Older adult' || isIll) {
       standardMin = 2;
       standardIdeal = 2;
       standardMax = 2;
+    } else if (ageGroup === 'Teen') {
+      standardMin = 2;
+      standardIdeal = 3;
+      standardMax = 3;
     } else {
       standardMin = 2;
-      standardIdeal = isIll ? 2 : (ageGroup === 'Teen' ? 3 : 2);
+      standardIdeal = 2;
       standardMax = 3;
     }
     typicalUnitDescription = '2–3 Pooris';
   } else if (name.includes('chapati') || name.includes('roti')) {
-    if (ageGroup === 'Child') {
+    if (ageGroup === 'Child' || ageGroup === 'Older adult') {
       standardMin = 1;
       standardIdeal = 2;
       standardMax = 2;
@@ -199,7 +189,7 @@ export function getPracticalServingInfo(
   ) {
     standardMin = 1;
     standardIdeal = 1;
-    standardMax = 1;
+    standardMax = ageGroup === 'Teen' ? 2 : 1;
     typicalUnitDescription = '1 piece';
   } else if (name.includes('egg') || name.includes('muttai')) {
     if (ageGroup === 'Child' || ageGroup === 'Older adult') {
@@ -217,24 +207,16 @@ export function getPracticalServingInfo(
     standardMin = 1;
     standardIdeal = 1;
     standardMax = 1;
-    typicalUnitDescription = '1 serving';
+    typicalUnitDescription = '1 normal serving';
   }
 
-  // Determine practical candidate quantities that are <= available stock
+  // Determine practical candidate quantities
   const candidatesSet = new Set<number>();
-  if (available >= standardIdeal) {
-    candidatesSet.add(standardIdeal);
-  }
+  candidatesSet.add(standardIdeal);
   for (let q = standardMin; q <= standardMax; q++) {
-    if (q <= available && q > 0) {
+    if (q > 0) {
       candidatesSet.add(q);
     }
-  }
-
-  // If available is strictly less than standardMin but > 0, we can only provide available
-  const isLowAvailability = available > 0 && available < standardMin;
-  if (isLowAvailability && available > 0) {
-    candidatesSet.add(available);
   }
 
   const candidateQuantities = Array.from(candidatesSet).sort((a, b) => {
@@ -243,16 +225,7 @@ export function getPracticalServingInfo(
     return b - a;
   });
 
-  const isCompletelyOutOfStock = available <= 0;
-
-  let portionRationale = '';
-  if (isCompletelyOutOfStock) {
-    portionRationale = `${food.name} is out of stock (0 available at hotel).`;
-  } else if (isLowAvailability) {
-    portionRationale = `Only ${available} ${food.name} available at hotel (standard practical portion for ${ageGroup} is ${typicalUnitDescription}). Availability limit reached.`;
-  } else {
-    portionRationale = `MealQuest suggests a practical portion of ${candidateQuantities[0] || 1} ${food.name} (hotel has ${available} in stock).`;
-  }
+  const portionRationale = `MealQuest suggests a practical portion of ${typicalUnitDescription} for a ${ageGroup}.`;
 
   return {
     standardMin,
@@ -260,8 +233,6 @@ export function getPracticalServingInfo(
     standardMax,
     typicalUnitDescription,
     candidateQuantities,
-    isLowAvailability,
-    isCompletelyOutOfStock,
     portionRationale
   };
 }
@@ -277,7 +248,7 @@ export function generateRecommendation(
   const ageGroup = getAgeGroup(userAge);
   const remainingBudget = Math.max(0, profile.dailyBudget - spentToday);
 
-  // Target budget suggestion per meal (typically ~35-45% of daily budget or remaining)
+  // Target budget suggestion per meal
   const mealBudgetCap = Math.max(40, Math.min(remainingBudget, Math.round(profile.dailyBudget * 0.45)));
 
   // Parse avoid list
@@ -315,15 +286,8 @@ export function generateRecommendation(
     };
   }
 
-  // 2. Filter out items with 0 available quantity and avoided items
+  // 2. Filter out avoided items
   let candidateFoods = inventory.filter(item => {
-    const avail = Math.max(
-      0,
-      typeof item.availableQuantity === 'number'
-        ? item.availableQuantity
-        : (typeof item.quantity === 'number' ? item.quantity : 0)
-    );
-    if (avail <= 0) return false;
     const itemName = item.name.toLowerCase();
     const isAvoided = avoidList.some(avoid => itemName.includes(avoid) || (avoid.length > 2 && avoid.includes(itemName)));
     return !isAvoided;
@@ -397,15 +361,15 @@ export function generateRecommendation(
       budgetCap: mealBudgetCap,
       remainingDailyBudget: remainingBudget,
       status: 'NO_MAIN_FOOD',
-      errorMessage: `A proper main food is missing from the current inventory. Available items (${presentItems}) lack a proper main food base (such as Rice, Dosa, Idli, Chapati, Pongal, Poori, Upma, or Noodles). Side dishes, drinks, and accompaniments alone do not constitute a complete meal.`,
+      errorMessage: `NO PRACTICAL COMPLETE MEAL AVAILABLE: A main food base (such as Rice, Dosa, Idli, Chapati, Poori, Pongal, Upma, or Noodles) is needed. Available items (${presentItems}) consist only of sides, proteins, or accompaniments, which alone do not constitute a complete meal.`,
       generatedAt,
       portionCheck: 'Missing main food foundation',
       portionDecision: 'Cannot determine portion without a main food anchor.',
       isLimitedPortion: false,
       ageContextNote: `Age: ${userAge} (${ageGroup})`,
       whyBreakdown: {
-        mainFoodReason: 'A complete, practical meal requires a solid main food base. Side dishes like Sambar, Curd, or single accompaniments cannot stand as a full meal.',
-        quantityNote: 'No main food was present to apply quantity multipliers.',
+        mainFoodReason: 'A complete, practical meal requires a solid staple main food base. Side dishes like Sambar, Curd, or single accompaniments cannot stand as a full meal.',
+        quantityNote: 'No main food was present.',
         budgetReason: 'Budget cannot be evaluated without a complete meal.',
         preferenceReason: `Preferences (${profile.foodPreference}) were verified, but a main carbohydrate source is missing.`,
         avoidReason: avoidList.length > 0 ? `Excluded avoided items: ${avoidList.join(', ')}` : 'No avoided foods specified.',
@@ -457,9 +421,6 @@ export function generateRecommendation(
     score: number;
     description: string;
     portionDecisionNotes: string;
-    isLimited: boolean;
-    isComplete: boolean;
-    limitedWarning?: string;
   }
 
   const combinations: CombinationCandidate[] = [];
@@ -467,39 +428,13 @@ export function generateRecommendation(
   const createCandidate = (
     chosenItemsWithQty: { item: FoodItem; recommendedQuantity: number }[]
   ): CombinationCandidate => {
-    let candidateIsLimited = false;
-    let candidateLimitedWarning: string | undefined = undefined;
-    let candidatePortionNotes: string[] = [];
-    let isComplete = true;
-
     const selections: RecommendedItemSelection[] = chosenItemsWithQty.map(({ item, recommendedQuantity }) => {
-      const avail = Math.max(
-        0,
-        typeof item.availableQuantity === 'number'
-          ? item.availableQuantity
-          : (typeof item.quantity === 'number' ? item.quantity : 0)
-      );
-
-      // Capped by availability
-      const actualRecommended = Math.max(1, Math.min(avail, recommendedQuantity));
-      const servingInfo = getPracticalServingInfo(item, mealType, userAge, isIll);
-
-      if (servingInfo.isLowAvailability && item.category === 'MAIN FOOD') {
-        candidateIsLimited = true;
-        candidateLimitedWarning = `⚠️ LIMITED HOTEL PORTION ADVISORY: Only ${avail} ${item.name} is currently available in hotel inventory (practical portion for a ${ageGroup} is ${servingInfo.typicalUnitDescription}). Suggested serving is constrained to available stock.`;
-      }
-
-      candidatePortionNotes.push(
-        `${formatServingItem(item.name, actualRecommended)} (Hotel stock: ${avail})`
-      );
-
       return {
         food: item,
-        recommendedQuantity: actualRecommended,
-        availableQuantity: avail,
-        quantity: actualRecommended, // alias
+        recommendedQuantity,
+        quantity: recommendedQuantity, // alias
         unitPrice: item.price,
-        subtotal: item.price * actualRecommended,
+        subtotal: item.price * recommendedQuantity,
         role: item.category
       };
     });
@@ -508,18 +443,6 @@ export function generateRecommendation(
     const mainSelection = selections.find(i => i.role === 'MAIN FOOD')!;
     const mainServingInfo = getPracticalServingInfo(mainSelection.food, mealType, userAge, isIll);
 
-    // Completeness check:
-    // A standalone 1 Idli or 1 Chapati when standard is 2+ is NOT a complete meal unless supplemented!
-    if (mainServingInfo.isLowAvailability) {
-      const hasProteinOrCompanion = selections.some(
-        s => s !== mainSelection && (s.role === 'PROTEIN' || s.role === 'MAIN FOOD' || s.role === 'FRIED / HEAVY')
-      );
-      if (!hasProteinOrCompanion) {
-        // Under-stocked main without any hearty companion is not a complete meal!
-        isComplete = false;
-      }
-    }
-
     // Base scoring
     let score = 100;
 
@@ -527,25 +450,14 @@ export function generateRecommendation(
     if (totalCost > remainingBudget) {
       score -= 300;
     } else if (totalCost <= mealBudgetCap) {
-      score += 35;
+      score += 40;
     } else {
       score += 15;
     }
 
-    // If candidate has full complete portion (not limited by low stock), reward heavily
-    if (!candidateIsLimited) {
-      score += 40;
-    } else {
-      score -= 50; // Deprioritize under-stocked portions when full complete options exist
-    }
-
-    if (!isComplete) {
-      score -= 120;
-    }
-
     // Age-aware practical portion alignment
     if (mainSelection.recommendedQuantity === mainServingInfo.standardIdeal) {
-      score += 25; // Ideal practical portion for age group
+      score += 30; // Ideal practical portion for age group
     } else if (
       mainSelection.recommendedQuantity >= mainServingInfo.standardMin &&
       mainSelection.recommendedQuantity <= mainServingInfo.standardMax
@@ -557,15 +469,15 @@ export function generateRecommendation(
     for (const selection of selections) {
       const { food } = selection;
       if (isIll) {
-        if (isFriedOrHeavy(food.name, food.category)) score -= 90;
-        if (isLightAndEasyToDigest(food.name)) score += 45;
+        if (isFriedOrHeavy(food.name, food.category)) score -= 100;
+        if (isLightAndEasyToDigest(food.name)) score += 50;
       } else {
-        if (isFriedOrHeavy(food.name, food.category)) score -= 15;
+        if (isFriedOrHeavy(food.name, food.category)) score -= 10;
       }
     }
 
     // Nutritional balance bonuses
-    if (selections.some(i => i.role === 'PROTEIN')) score += 30;
+    if (selections.some(i => i.role === 'PROTEIN')) score += 35;
     if (selections.some(i => i.role === 'VEGETABLE')) score += 20;
     if (selections.some(i => i.role === 'SIDE / ACCOMPANIMENT')) score += 15;
 
@@ -574,19 +486,14 @@ export function generateRecommendation(
       .map(s => formatServingItem(s.food.name, s.recommendedQuantity))
       .join(' + ');
 
-    const portionDecisionNotes = candidateIsLimited
-      ? `Limited availability: Hotel has only ${mainSelection.availableQuantity} ${mainSelection.food.name} (standard portion for ${ageGroup} is ${mainServingInfo.typicalUnitDescription}). ${isComplete ? 'Paired with companion food to complete the meal.' : 'Insufficient for a full meal.'}`
-      : `MealQuest suggests a practical portion of ${formatServingItem(mainSelection.food.name, mainSelection.recommendedQuantity)} for a ${ageGroup} (${userAge} yrs) ${mealType} meal. This is based on practical sustenance, not hotel stock.`;
+    const portionDecisionNotes = `MealQuest suggests a practical portion of ${formatServingItem(mainSelection.food.name, mainSelection.recommendedQuantity)} for a ${ageGroup} (${userAge} yrs) ${mealType} meal.`;
 
     return {
       items: selections,
       totalCost,
       score,
       description,
-      portionDecisionNotes,
-      isLimited: candidateIsLimited,
-      isComplete,
-      limitedWarning: candidateLimitedWarning
+      portionDecisionNotes
     };
   };
 
@@ -613,6 +520,7 @@ export function generateRecommendation(
   });
 
   // Generate candidate combinations for each main food
+  // NEVER combine two main foods together!
   for (const main of sortedMains) {
     const mainServingInfo = getPracticalServingInfo(main, mealType, userAge, isIll);
     const candidateQuantities = mainServingInfo.candidateQuantities;
@@ -639,10 +547,9 @@ export function generateRecommendation(
 
       // 3. Main + Protein (e.g., 2 Idlis + 1 Egg, 1 Pongal + 1 Egg, 2 Pooris + 1 Egg)
       if (compatibleProteins.length > 0) {
-        const proteinQty = (ageGroup === 'Teen' || ageGroup === 'Young adult') && compatibleProteins[0].availableQuantity >= 2 && mQty <= 2 ? 1 : 1;
         combinations.push(createCandidate([
           { item: main, recommendedQuantity: mQty },
-          { item: compatibleProteins[0], recommendedQuantity: proteinQty }
+          { item: compatibleProteins[0], recommendedQuantity: 1 }
         ]));
       }
 
@@ -671,28 +578,19 @@ export function generateRecommendation(
   }
 
   // Filter combinations:
-  // First priority: Complete meals fitting within budget
-  const completeBudgetCombos = combinations.filter(c => c.totalCost <= remainingBudget && c.isComplete);
-  const anyBudgetCombos = combinations.filter(c => c.totalCost <= remainingBudget);
+  // First priority: Meals fitting within budget
+  const budgetCombos = combinations.filter(c => c.totalCost <= remainingBudget);
 
   let bestCombo: CombinationCandidate | undefined;
-  if (completeBudgetCombos.length > 0) {
-    completeBudgetCombos.sort((a, b) => b.score - a.score);
-    bestCombo = completeBudgetCombos[0];
-  } else if (anyBudgetCombos.length > 0) {
-    anyBudgetCombos.sort((a, b) => b.score - a.score);
-    bestCombo = anyBudgetCombos[0];
+  if (budgetCombos.length > 0) {
+    budgetCombos.sort((a, b) => b.score - a.score);
+    bestCombo = budgetCombos[0];
   } else {
     combinations.sort((a, b) => b.score - a.score);
     bestCombo = combinations[0];
   }
 
-  // If no combination could be formed or the best is not complete
-  if (!bestCombo || (!bestCombo.isComplete && bestCombo.items.length === 1 && bestCombo.isLimited)) {
-    const singleMain = bestCombo?.items[0];
-    const foodName = singleMain ? singleMain.food.name : 'main food';
-    const avail = singleMain ? singleMain.availableQuantity : 1;
-
+  if (!bestCombo) {
     return {
       mealType,
       items: [],
@@ -700,21 +598,20 @@ export function generateRecommendation(
       fitsBudget: true,
       budgetCap: mealBudgetCap,
       remainingDailyBudget: remainingBudget,
-      status: 'NO_COMPLETE_MEAL',
-      errorMessage: `No practical complete meal available from current hotel inventory. Only ${avail} ${foodName} is in stock, which is below the practical portion for a ${ageGroup}. A single under-portioned item cannot form a complete meal. Please replenish inventory or pair with another available dish.`,
+      status: 'NO_AVAILABLE_FOOD',
+      errorMessage: 'Could not generate a viable meal recommendation. Please verify your inventory.',
       generatedAt,
-      portionCheck: `Only ${avail} ${foodName} available (below practical portion)`,
-      portionDecision: 'Incomplete meal due to limited hotel inventory.',
-      isLimitedPortion: true,
-      limitedPortionWarning: `LIMITED HOTEL INVENTORY: Only ${avail} ${foodName} available.`,
+      portionCheck: 'No combination formed',
+      portionDecision: 'Could not form meal.',
+      isLimitedPortion: false,
       ageContextNote: `Age: ${userAge} (${ageGroup})`,
       whyBreakdown: {
-        mainFoodReason: `Only ${avail} ${foodName} in stock. A practical portion is larger.`,
-        quantityNote: 'Below minimum complete meal portion',
-        budgetReason: `Budget of ₹${remainingBudget} is available.`,
+        mainFoodReason: 'Could not form meal.',
+        quantityNote: 'None',
+        budgetReason: `Budget of ₹${remainingBudget} available.`,
         preferenceReason: `Preferences: ${profile.foodPreference}`,
         avoidReason: avoidList.length > 0 ? `Avoid list: ${avoidList.join(', ')}` : 'None',
-        profileContextReason: 'Requires sufficient portion to constitute a meal.'
+        profileContextReason: 'Requires sufficient items to constitute a meal.'
       },
       itemReasons: [],
       alternatives: []
@@ -723,7 +620,7 @@ export function generateRecommendation(
 
   // Item reasons
   const itemReasons = bestCombo.items.map(selection => {
-    const { food, recommendedQuantity, availableQuantity, subtotal } = selection;
+    const { food, recommendedQuantity, subtotal } = selection;
     let reason = '';
 
     if (food.category === 'MAIN FOOD') {
@@ -748,7 +645,6 @@ export function generateRecommendation(
       name: food.name,
       role: food.category,
       recommendedQuantity,
-      availableQuantity,
       quantity: recommendedQuantity,
       subtotal,
       reason
@@ -774,17 +670,16 @@ export function generateRecommendation(
     ? `Total meal cost is ₹${bestCombo.totalCost}, fitting cleanly within your remaining coin budget of ₹${remainingBudget} (leaving ₹${remainingAfterMeal} for the rest of today).`
     : `Total cost (₹${bestCombo.totalCost}) exceeds your remaining coin budget of ₹${remainingBudget}.`;
 
-  // Portion check line: explicitly distinguishes recommended serving from available hotel stock
   const portionCheckParts = bestCombo.items.map(
-    i => `${formatServingItem(i.food.name, i.recommendedQuantity)} recommended (${i.availableQuantity} available at hotel)`
+    i => `${formatServingItem(i.food.name, i.recommendedQuantity)} recommended`
   );
   const portionCheck = portionCheckParts.join(', ');
 
   const portionDecision = bestCombo.portionDecisionNotes;
 
-  // Alternatives: distinct practical combinations
-  const alternativeCombos = (completeBudgetCombos.length > 0 ? completeBudgetCombos : combinations)
-    .filter(c => c.description !== bestCombo!.description && c.isComplete)
+  // Alternatives: distinct practical combinations with different main items or structures
+  const alternativeCombos = (budgetCombos.length > 0 ? budgetCombos : combinations)
+    .filter(c => c.description !== bestCombo!.description)
     .slice(0, 3);
 
   const alternatives = alternativeCombos.map((alt, idx) => {
@@ -819,8 +714,7 @@ export function generateRecommendation(
     generatedAt,
     portionCheck,
     portionDecision,
-    isLimitedPortion: bestCombo.isLimited,
-    limitedPortionWarning: bestCombo.limitedWarning,
+    isLimitedPortion: false,
     ageContextNote: `Tailored for ${ageGroup} (${userAge} yrs): ${getAgeGroupDescription(ageGroup)}`,
     whyBreakdown: {
       mainFoodReason: `${mainItem.food.name} is selected as the available main food anchor.`,
@@ -830,7 +724,7 @@ export function generateRecommendation(
       quantityNote: portionCheck,
       budgetReason,
       preferenceReason: `Strictly verified against your ${profile.foodPreference} preference.`,
-      avoidReason: avoidList.length > 0 ? `Foods matching your avoid list (${avoidList.join(', ')}) were strictly excluded.` : 'No foods on your avoid list.',
+      avoidReason: avoidList.length > 0 ? `Foods matching your avoid list (${avoidList.join(', ')}).` : 'No foods on your avoid list.',
       conditionReason,
       profileContextReason
     },

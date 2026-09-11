@@ -17,10 +17,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onStartQuest }) => {
   return (
     <div
       id="splash-screen-container"
-      className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-[#070810] text-slate-100 px-4 py-8"
+      className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-[#131627] text-slate-100 px-4 py-8"
     >
       {/* Background RPG glow effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(147,51,234,0.18),rgba(11,12,20,0.95))] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(147,51,234,0.18),rgba(19,22,39,0.95))] pointer-events-none" />
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-900/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-amber-600/15 rounded-full blur-3xl pointer-events-none" />
 
@@ -77,7 +77,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onStartQuest }) => {
             <span>The Adventurer's Dilemma Solved</span>
           </div>
           <p className="text-slate-300 leading-relaxed text-xs sm:text-sm">
-            Eating outside at the hotel with limited options? MealQuest analyzes your <strong className="text-white">actually available foods</strong>, prices, quantities, and daily coin budget to forge the perfect breakfast, lunch, and dinner.
+            Eating outside at the hotel with limited options? MealQuest analyzes your <strong className="text-white">actually available foods</strong>, prices, and daily coin budget to forge the perfect breakfast, lunch, and dinner.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2 text-xs text-slate-400 border-t border-purple-500/20">
             <span className="flex items-center gap-1 text-emerald-400">

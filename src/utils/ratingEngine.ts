@@ -52,10 +52,10 @@ export function evaluateActualMeal(
 
   // Check what was realistically available in the hotel inventory
   const proteinWasAvailable = availableInventory && availableInventory.length > 0
-    ? availableInventory.some(i => i.category === 'PROTEIN' && i.quantity > 0)
+    ? availableInventory.some(i => i.category === 'PROTEIN')
     : true;
   const vegWasAvailable = availableInventory && availableInventory.length > 0
-    ? availableInventory.some(i => i.category === 'VEGETABLE' && i.quantity > 0)
+    ? availableInventory.some(i => i.category === 'VEGETABLE')
     : true;
 
   // Base scores (out of 2 each, total 10)

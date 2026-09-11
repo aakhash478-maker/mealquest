@@ -91,7 +91,6 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
   // New food manual input states
   const [newFoodName, setNewFoodName] = useState('');
   const [newFoodPrice, setNewFoodPrice] = useState<number>(20);
-  const [newFoodQuantity, setNewFoodQuantity] = useState<number>(1);
   const [newFoodCategory, setNewFoodCategory] = useState<FoodCategory>('MAIN FOOD');
   const [addFoodError, setAddFoodError] = useState('');
 
@@ -131,12 +130,6 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     setLocalItems(prev => prev.map(item => (item.id === id ? { ...item, price: validPrice } : item)));
   };
 
-  // Handle edit quantity / available stock
-  const handleQuantityChange = (id: string, qty: number) => {
-    const validQty = Math.max(0, isNaN(qty) ? 0 : qty);
-    setLocalItems(prev => prev.map(item => (item.id === id ? { ...item, availableQuantity: validQty, quantity: validQty } : item)));
-  };
-
   // Handle edit category
   const handleCategoryChange = (id: string, cat: FoodCategory) => {
     setLocalItems(prev => prev.map(item => (item.id === id ? { ...item, category: cat } : item)));
@@ -165,16 +158,14 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     const updatedLocal = localItems.map(item => {
       const match = items.find(im => im.name.toLowerCase() === item.name.toLowerCase());
       if (match) {
-        const avail = match.availableQuantity ?? match.quantity ?? 1;
-        return { ...item, price: match.price, availableQuantity: avail, quantity: avail, category: match.category };
+        return { ...item, price: match.price, category: match.category };
       }
       return item;
     });
 
     for (const item of items) {
       if (!existingNames.has(item.name.toLowerCase())) {
-        const avail = item.availableQuantity ?? item.quantity ?? 1;
-        newOnes.push({ ...item, availableQuantity: avail, quantity: avail });
+        newOnes.push({ ...item });
       }
     }
 
@@ -203,13 +194,10 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
       return;
     }
 
-    const availQty = Math.max(0, newFoodQuantity);
     const newItem: FoodItem = {
       id: `${activeMeal[0]}-${Date.now()}`,
       name: newFoodName.trim(),
       price: Math.max(0, newFoodPrice),
-      availableQuantity: availQty,
-      quantity: availQty,
       category: newFoodCategory
     };
 
@@ -220,11 +208,10 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
     // Reset inputs
     setNewFoodName('');
     setNewFoodPrice(20);
-    setNewFoodQuantity(1);
     setAddFoodError('');
   };
 
-  // Save current prices & quantities
+  // Save current prices
   const handleSaveInventory = () => {
     playButtonClick();
     onUpdateInventory(activeMeal, localItems);
@@ -334,7 +321,7 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
       dateKey: getLocalDateKey(),
       mealType: activeMeal,
       recommendedSummary: recommendation && recommendation.items.length > 0
-        ? recommendation.items.map(i => `${i.quantity} × ${i.food.name}`).join(' + ')
+        ? recommendation.items.map(i => `${i.recommendedQuantity} × ${i.food.name}`).join(' + ')
         : 'None generated',
       recommendedCost: recommendation ? recommendation.totalCost : 0,
       recommendedGeneratedAt: recommendation ? recommendation.generatedAt : undefined,
@@ -519,7 +506,7 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                   </span>
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Unit prices & quantities are <strong className="text-amber-300">editable</strong>. Total cost updates in real time. Items with 0 quantity will be excluded.
+                  Unit prices are <strong className="text-amber-300">editable</strong>. Every dish listed here is currently available at the hotel.
                 </p>
               </div>
 
@@ -528,7 +515,7 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                   id="btn-save-inventory"
                   onClick={handleSaveInventory}
                   className="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-600 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
-                  title="Save edited prices & quantities to local storage"
+                  title="Save edited prices to local storage"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Inventory</span>
@@ -549,7 +536,7 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
             {inventorySavedFeedback && (
               <div className="p-2.5 rounded-lg bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Inventory prices and quantities saved successfully to your local quest storage!</span>
+                <span>Inventory prices saved successfully to your local quest storage!</span>
               </div>
             )}
 
@@ -557,9 +544,9 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
             <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-xs text-purple-200 flex items-start gap-2.5">
               <HelpCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
               <div className="space-y-0.5 text-[11px] leading-relaxed">
-                <strong className="text-amber-300 font-mono">Hotel Stock vs Serving Portion: </strong>
+                <strong className="text-amber-300 font-mono">Hotel Food Availability: </strong>
                 <span>
-                  Hotel stock indicates how many units are available at the hotel (an availability ceiling).
+                  Foods listed below are currently available at the hotel.
                   MealQuest recommends practical serving portions (e.g. 2–3 Idlis, 1–2 Dosas) independently based on food type, age group, meal time, and budget.
                 </span>
               </div>
@@ -578,16 +565,13 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                     <tr className="text-slate-400 border-b border-purple-500/20 text-[11px] uppercase font-mono">
                       <th className="pb-2 font-medium">Food Name</th>
                       <th className="pb-2 font-medium">Category / Role</th>
-                      <th className="pb-2 font-medium w-24">Price (₹)</th>
-                      <th className="pb-2 font-medium w-28">Availability</th>
-                      <th className="pb-2 font-medium w-36 text-center">Hotel Stock Limit</th>
-                      <th className="pb-2 font-medium text-right w-12">Action</th>
+                      <th className="pb-2 font-medium w-28">Price (₹)</th>
+                      <th className="pb-2 font-medium w-32">Status</th>
+                      <th className="pb-2 font-medium text-right w-16">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-500/10">
                     {localItems.map(item => {
-                      const avail = item.availableQuantity ?? item.quantity ?? 0;
-                      const isAvailable = avail > 0;
                       let badgeColor = 'bg-slate-800 text-slate-300';
                       if (item.category === 'MAIN FOOD') badgeColor = 'bg-indigo-950/80 text-indigo-300 border-indigo-500/40';
                       else if (item.category === 'PROTEIN') badgeColor = 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40';
@@ -597,13 +581,10 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                       else if (item.category === 'FRIED / HEAVY') badgeColor = 'bg-rose-950/80 text-rose-300 border-rose-500/40';
 
                       return (
-                        <tr key={item.id} className={`hover:bg-purple-950/20 transition-colors ${!isAvailable ? 'opacity-60 bg-rose-950/10' : ''}`}>
+                        <tr key={item.id} className="hover:bg-purple-950/20 transition-colors">
                           {/* Name */}
                           <td className="py-2.5 font-bold text-white">
                             <span>{item.name}</span>
-                            {!isAvailable && (
-                              <span className="block text-[10px] text-rose-400 font-mono font-normal">Out of Stock</span>
-                            )}
                           </td>
 
                           {/* Category Badge / Selector */}
@@ -639,51 +620,10 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
 
                           {/* Availability Status Badge */}
                           <td className="py-2.5">
-                            {isAvailable ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300">
-                                <Check className="w-3 h-3 text-emerald-400" />
-                                <span>Available</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-rose-950/80 border border-rose-500/40 text-rose-300">
-                                <X className="w-3 h-3 text-rose-400" />
-                                <span>Out of Stock</span>
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Hotel Stock Limit (Editable Inventory Management Constraint) */}
-                          <td className="py-2.5">
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleQuantityChange(item.id, Math.max(0, avail - 1))}
-                                  className="w-5 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
-                                  title="Decrease available stock"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  id={`input-qty-${item.id}`}
-                                  type="number"
-                                  min="0"
-                                  value={avail}
-                                  onChange={e => handleQuantityChange(item.id, parseInt(e.target.value, 10))}
-                                  className="w-12 px-1 py-0.5 rounded bg-slate-900 border border-purple-500/30 text-white font-mono text-xs text-center focus:border-amber-400 focus:outline-none"
-                                  title="Hotel inventory quantity available"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleQuantityChange(item.id, avail + 1)}
-                                  className="w-5 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
-                                  title="Increase available stock"
-                                >
-                                  +
-                                </button>
-                              </div>
-                              <span className="text-[9px] font-mono text-slate-500">hotel stock ceiling</span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300">
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span>Available</span>
+                            </span>
                           </td>
 
                           {/* Delete Button */}
@@ -746,30 +686,16 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Price (₹)</label>
-                  <input
-                    id="input-add-food-price"
-                    type="number"
-                    min="0"
-                    value={newFoodPrice}
-                    onChange={e => setNewFoodPrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-purple-500/30 text-white text-xs sm:text-sm font-mono focus:border-purple-400 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Quantity</label>
-                  <input
-                    id="input-add-food-qty"
-                    type="number"
-                    min="1"
-                    value={newFoodQuantity}
-                    onChange={e => setNewFoodQuantity(parseInt(e.target.value, 10) || 1)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-purple-500/30 text-white text-xs sm:text-sm font-mono focus:border-purple-400 focus:outline-none"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Price per serving (₹)</label>
+                <input
+                  id="input-add-food-price"
+                  type="number"
+                  min="0"
+                  value={newFoodPrice}
+                  onChange={e => setNewFoodPrice(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-purple-500/30 text-white text-xs sm:text-sm font-mono focus:border-purple-400 focus:outline-none"
+                />
               </div>
 
               <div>
@@ -1011,8 +937,8 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                             <span>{getRoleIcon(selection.role)}</span>
                             <span>{selection.role}</span>
                           </span>
-                          <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                            Hotel stock: {selection.availableQuantity} avail
+                          <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                            Available in hotel
                           </span>
                         </div>
                         <div className="text-lg font-bold text-white mt-2">
@@ -1067,7 +993,6 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
                             </p>
                             <div className="text-[11px] font-mono text-amber-300/90">
                               ₹{selection.unitPrice} each × {selection.recommendedQuantity} = ₹{selection.subtotal}
-                              <span className="text-slate-400 ml-2">(Hotel Stock: {selection.availableQuantity})</span>
                             </div>
                           </div>
                         </div>
@@ -1326,23 +1251,16 @@ export const MealQuestView: React.FC<MealQuestViewProps> = ({
             </span>
             <div className="flex flex-wrap gap-1.5">
               {localItems.map(item => {
-                const avail = item.availableQuantity ?? item.quantity ?? 0;
-                const isOutOfStock = avail === 0;
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => handleAddDishToActual(item)}
-                    className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
-                      isOutOfStock
-                        ? 'bg-slate-900/50 hover:bg-slate-800 border-slate-800 text-slate-400'
-                        : 'bg-slate-900 hover:bg-purple-900/50 border-purple-500/30 text-slate-300 hover:text-white'
-                    }`}
+                    className="px-2.5 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 bg-slate-900 hover:bg-purple-900/50 border-purple-500/30 text-slate-300 hover:text-white"
                   >
                     <Plus className="w-3 h-3 text-purple-400" />
                     <span>{item.name}</span>
                     <span className="text-[10px] text-amber-300 font-mono">₹{item.price}</span>
-                    {isOutOfStock && <span className="text-[9px] text-rose-400 font-mono">(Out of stock)</span>}
                   </button>
                 );
               })}

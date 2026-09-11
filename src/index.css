@@ -62,8 +62,13 @@
 }
 
 .rpg-card {
-  background: linear-gradient(180deg, rgba(26, 20, 48, 0.75) 0%, rgba(15, 14, 28, 0.85) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.22);
+  background: linear-gradient(180deg, rgba(34, 40, 72, 0.88) 0%, rgba(24, 28, 54, 0.94) 100%);
+  border: 1px solid rgba(167, 139, 250, 0.28);
   backdrop-filter: blur(12px);
+}
+
+.rpg-card-subtle {
+  background: rgba(28, 33, 62, 0.8);
+  border: 1px solid rgba(196, 181, 253, 0.18);
 }
 

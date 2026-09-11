@@ -20,8 +20,6 @@ export interface FoodItem {
   id: string;
   name: string;
   price: number;
-  availableQuantity: number;
-  quantity?: number; // backwards compatibility alias for availableQuantity
   category: FoodCategory;
 }
 
@@ -44,7 +42,6 @@ export interface PlayerProfile {
 export interface RecommendedItemSelection {
   food: FoodItem;
   recommendedQuantity: number;
-  availableQuantity: number;
   unitPrice: number;
   subtotal: number;
   role: FoodCategory;
@@ -83,7 +80,6 @@ export interface MealRecommendation {
     name: string;
     role: FoodCategory;
     recommendedQuantity: number;
-    availableQuantity: number;
     quantity: number;
     subtotal: number;
     reason: string;
