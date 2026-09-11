@@ -6,37 +6,40 @@ const MAIN_FOOD_KEYWORDS = [
   'parotta', 'paratha', 'pongal', 'upma', 'poori', 'puri', 'bread',
   'noodles', 'naan', 'biryani', 'biriyani', 'pulao', 'fried rice',
   'appam', 'puttu', 'kulcha', 'oats', 'pasta', 'sandwich', 'khichdi',
-  'phulka', 'bhature'
+  'phulka', 'bhature', 'meals', 'thali', 'maggi', 'sevai', 'idiyappam',
+  'paniyaram', 'kuzhi paniyaram', 'uttapam', 'uthappam'
 ];
 
 const PROTEIN_KEYWORDS = [
   'egg', 'chicken', 'fish', 'mutton', 'paneer', 'tofu', 'chickpeas',
   'chana', 'soya', 'soy', 'prawn', 'prawns', 'beef', 'pork', 'lamb',
-  'dal', 'daal', 'lentil', 'lentils', 'rajma', 'sprouts', 'meat'
+  'dal', 'daal', 'lentil', 'lentils', 'rajma', 'sprouts', 'meat',
+  'crab', 'seafood', 'keema'
 ];
 
 const VEGETABLE_KEYWORDS = [
-  'poriyal', 'vegetable', 'vegetables', 'veg', 'salad', 'keerai',
+  'vegetable curry', 'veg curry', 'poriyal', 'vegetable', 'vegetables', 'veg', 'salad', 'keerai',
   'spinach', 'kootu', 'gobi', 'cauliflower', 'bhindi', 'okra',
   'cabbage', 'carrot', 'beans', 'palak', 'avial', 'subzi', 'sabzi',
-  'beetroot', 'cucumber', 'brinjal', 'baingan'
+  'beetroot', 'cucumber', 'brinjal', 'baingan', 'capsicum', 'mushroom',
+  'aloo gobi', 'mixed veg'
 ];
 
 const SIDE_KEYWORDS = [
   'sambar', 'sambhar', 'curd', 'yogurt', 'raita', 'chutney', 'rasam',
-  'gravy', 'curry', 'salna', 'pickle', 'thuvaiyal', 'dip', 'sauce',
+  'gravy', 'curry', 'salna', 'kurma', 'pickle', 'thuvaiyal', 'dip', 'sauce',
   'soup', 'buttermilk'
 ];
 
 const DRINK_KEYWORDS = [
   'tea', 'coffee', 'juice', 'water', 'lassi', 'milk', 'badam milk',
-  'soda', 'beverage'
+  'soda', 'beverage', 'chai'
 ];
 
 const FRIED_HEAVY_KEYWORDS = [
   'vada', 'vadai', 'fried chicken', 'chicken 65', 'pakoda', 'pakora',
   'bajji', 'bhajji', 'samosa', 'bonda', 'french fries', 'cutlet',
-  'deep fried', 'crispy'
+  'deep fried', 'crispy', 'spring roll', 'murukku'
 ];
 
 const NON_VEG_KEYWORDS = [
@@ -46,7 +49,8 @@ const NON_VEG_KEYWORDS = [
 
 const LIGHT_EASY_DIGEST_KEYWORDS = [
   'idli', 'idly', 'pongal', 'khichdi', 'rice', 'rasam', 'curd',
-  'poriyal', 'boiled', 'tea', 'soup', 'steamed', 'oats', 'bread'
+  'poriyal', 'boiled', 'tea', 'soup', 'steamed', 'oats', 'bread',
+  'dosa', 'dosai', 'chapati', 'chapatti', 'phulka'
 ];
 
 export function detectFoodCategory(foodName: string): FoodCategory {

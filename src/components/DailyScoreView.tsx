@@ -118,18 +118,43 @@ export const DailyScoreView: React.FC<DailyScoreViewProps> = ({
             </div>
           </div>
 
-          {/* Right Summary Metric Block */}
-          <div className="flex flex-col gap-3 min-w-[220px]">
-            <div className="p-4 rounded-xl bg-slate-900/90 border border-purple-500/30 space-y-1">
-              <span className="block text-[10px] text-slate-400 uppercase font-mono">Total Coin Expenditure</span>
-              <div className="text-2xl font-bold font-mono text-white">₹{dailyScore.totalSpentToday}</div>
-              <div className="text-xs text-slate-400 font-mono">
-                Daily Budget: ₹{dailyScore.dailyBudget} (Remaining: <span className="text-amber-300">₹{dailyScore.remainingBudget}</span>)
+          {/* Right Summary Metric Block with Complete Budget Tracking */}
+          <div className="flex flex-col gap-3 min-w-[260px]">
+            <div className="p-4 rounded-xl bg-slate-900/90 border border-purple-500/30 space-y-2.5">
+              <div className="flex justify-between items-center pb-2 border-b border-purple-500/20">
+                <span className="text-[10px] text-slate-400 uppercase font-mono font-bold">Daily Coin Budget</span>
+                <span className="font-mono text-amber-300 font-bold text-base">₹{dailyScore.dailyBudget}</span>
+              </div>
+
+              {/* Meal-by-meal spending breakdown */}
+              <div className="space-y-1 text-xs font-mono">
+                <div className="flex justify-between text-slate-300">
+                  <span className="flex items-center gap-1">🌅 Breakfast:</span>
+                  <span>₹{dailyScore.breakfastSpent}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span className="flex items-center gap-1">☀️ Lunch:</span>
+                  <span>₹{dailyScore.lunchSpent}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span className="flex items-center gap-1">🌙 Dinner:</span>
+                  <span>₹{dailyScore.dinnerSpent}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-purple-500/20 flex justify-between items-center text-xs font-mono">
+                <span className="text-slate-400">Total Spent Today:</span>
+                <span className="font-bold text-white text-sm">₹{dailyScore.totalSpentToday}</span>
+              </div>
+
+              <div className="flex justify-between items-center text-xs font-mono bg-purple-950/40 p-2 rounded-lg border border-purple-500/30">
+                <span className="text-purple-300 font-semibold">Remaining Budget:</span>
+                <span className="font-bold text-amber-300 text-sm">₹{dailyScore.remainingBudget}</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/20 text-[11px] text-purple-200">
-              Scoring is calculated strictly from meals you actually logged today, not imagined ideal diets.
+            <div className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/20 text-[11px] text-purple-200">
+              Scoring is calculated strictly from meals you actually logged today.
             </div>
           </div>
         </div>

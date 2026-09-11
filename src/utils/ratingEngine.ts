@@ -1,6 +1,7 @@
 import {
   ActualMealLog,
   DailyScoreSummary,
+  FoodItem,
   MealRatingBreakdown,
   MealType,
   PlayerProfile,
@@ -14,7 +15,8 @@ export function evaluateActualMeal(
   actualCost: number,
   mealType: MealType,
   profile: PlayerProfile,
-  expectedMealBudget: number
+  expectedMealBudget: number,
+  availableInventory?: FoodItem[]
 ): MealRatingBreakdown {
   const lower = actualFoodText.toLowerCase();
   const items = actualFoodText
@@ -47,10 +49,28 @@ export function evaluateActualMeal(
     }
   }
 
+  // Check what was realistically available in the hotel inventory
+  const proteinWasAvailable = availableInventory && availableInventory.length > 0
+    ? availableInventory.some(i => i.category === 'PROTEIN' && i.quantity > 0)
+    : true;
+  const vegWasAvailable = availableInventory && availableInventory.length > 0
+    ? availableInventory.some(i => i.category === 'VEGETABLE' && i.quantity > 0)
+    : true;
+
   // Base scores (out of 2 each, total 10)
   let mealStructureScore = hasMain ? 2.0 : 0.5;
-  let proteinScore = hasProtein ? 2.0 : (profile.foodPreference === 'Vegetarian' && hasSide ? 1.5 : 1.0);
-  let varietyScore = (hasSide || hasVeg) ? 2.0 : 1.0;
+
+  // Fair score: do not penalize if no protein was available on the menu
+  let proteinScore = 2.0;
+  if (hasProtein) {
+    proteinScore = 2.0;
+  } else if (!proteinWasAvailable) {
+    proteinScore = 2.0; // Grace: hotel did not have protein in stock
+  } else {
+    proteinScore = (profile.foodPreference === 'Vegetarian' && hasSide) ? 1.5 : 1.0;
+  }
+
+  let varietyScore = (hasSide || hasVeg) ? 2.0 : (vegWasAvailable ? 1.0 : 1.6);
   let quantityScore = (actualQuantity >= 1 && actualQuantity <= 4) ? 2.0 : 1.2;
   let budgetScore = actualCost <= expectedMealBudget ? 2.0 : (actualCost <= expectedMealBudget * 1.2 ? 1.2 : 0.5);
 
@@ -60,7 +80,11 @@ export function evaluateActualMeal(
 
   // Positives
   if (hasMain) positivePoints.push('Contains a solid main meal foundation (carbohydrate base).');
-  if (hasProtein) positivePoints.push('Included an effective protein source to aid recovery and fullness.');
+  if (hasProtein) {
+    positivePoints.push('Included an effective protein source to aid recovery and fullness.');
+  } else if (!proteinWasAvailable) {
+    positivePoints.push('Fairly rated based on available hotel menu (no protein items were in stock).');
+  }
   if (hasVeg || hasSide) positivePoints.push('Added variety with vegetable or flavorful side accompaniment.');
   if (actualCost <= expectedMealBudget) positivePoints.push(`Stayed strictly within practical meal coin budget (₹${actualCost} <= ₹${expectedMealBudget}).`);
 
@@ -110,7 +134,9 @@ export function evaluateActualMeal(
   }
 
   if (!hasProtein && profile.foodPreference !== 'Vegetarian') {
-    constructivePoints.push('⚠️ Protein source was limited; consider adding egg or dal next time.');
+    if (proteinWasAvailable) {
+      constructivePoints.push('⚠️ Protein source was limited; consider adding egg or dal next time.');
+    }
   }
 
   // Calculate raw score
@@ -143,7 +169,9 @@ export function evaluateActualMeal(
       label: 'Protein Source',
       score: proteinScore,
       max: 2.0,
-      notes: hasProtein ? 'Quality protein included' : 'Minimal protein'
+      notes: hasProtein
+        ? 'Quality protein included'
+        : (!proteinWasAvailable ? 'No protein available at hotel (fairly evaluated)' : 'Minimal protein')
     },
     variety: {
       label: 'Variety & Accompaniment',
@@ -185,6 +213,10 @@ export function calculateDailyOverallScore(
   const totalSpent = loggedMeals.reduce((acc, m) => acc + m.actualCost, 0);
   const remainingBudget = Math.max(0, dailyBudget - totalSpent);
 
+  const breakfastSpent = morningLog?.actualCost || 0;
+  const lunchSpent = afternoonLog?.actualCost || 0;
+  const dinnerSpent = nightLog?.actualCost || 0;
+
   if (loggedMeals.length === 0) {
     return {
       dateKey: new Date().toISOString().split('T')[0],
@@ -194,6 +226,9 @@ export function calculateDailyOverallScore(
       mealsLoggedCount: 0,
       overallScore: null,
       whyOverallScore: 'No meals have been logged yet today. Complete your morning, afternoon, or night quest to establish your daily score!',
+      breakfastSpent: 0,
+      lunchSpent: 0,
+      dinnerSpent: 0,
       totalSpentToday: 0,
       dailyBudget,
       remainingBudget: dailyBudget
@@ -235,6 +270,9 @@ export function calculateDailyOverallScore(
     mealsLoggedCount: loggedMeals.length,
     overallScore,
     whyOverallScore: why,
+    breakfastSpent,
+    lunchSpent,
+    dinnerSpent,
     totalSpentToday: totalSpent,
     dailyBudget,
     remainingBudget

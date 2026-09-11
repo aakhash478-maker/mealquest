@@ -56,6 +56,7 @@ export interface MealRecommendation {
   remainingDailyBudget: number;
   status: 'SUCCESS' | 'NO_MAIN_FOOD' | 'OVER_BUDGET' | 'NO_AVAILABLE_FOOD';
   errorMessage?: string;
+  recommendationScore?: number;
   whyBreakdown: {
     mainFoodReason: string;
     proteinReason?: string;
@@ -64,6 +65,7 @@ export interface MealRecommendation {
     quantityNote: string;
     budgetReason: string;
     preferenceReason: string;
+    avoidReason?: string;
     conditionReason?: string;
     profileContextReason: string;
   };
@@ -109,6 +111,12 @@ export interface MealRatingBreakdown {
   constructivePoints: string[];
 }
 
+export interface ActualMealItem {
+  food: string;
+  quantity: number;
+  price?: number;
+}
+
 export interface ActualMealLog {
   id: string;
   timestamp: number;
@@ -121,6 +129,7 @@ export interface ActualMealLog {
   actualCost: number;
   rating: number;
   ratingBreakdown: MealRatingBreakdown;
+  structuredItems?: ActualMealItem[];
 }
 
 export interface DailyScoreSummary {
@@ -131,6 +140,9 @@ export interface DailyScoreSummary {
   mealsLoggedCount: number;
   overallScore: number | null;
   whyOverallScore: string;
+  breakfastSpent: number;
+  lunchSpent: number;
+  dinnerSpent: number;
   totalSpentToday: number;
   dailyBudget: number;
   remainingBudget: number;
